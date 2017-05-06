@@ -177,10 +177,10 @@ if __name__ == '__main__':
     config.data = QueueInput(config.dataflow)
     gpus = ['/gpu:{}'.format(k) for k in range(NR_GPU)]
     print(gpus)
-    #config.data = StagingInputWrapper(config.data, gpus)
-    #config.data = DummyConstantInput([[128, 224,224,3],[128]])
+    #config.data = DummyConstantInput([[64, 224,224,3],[64]])
     config.dataflow = None
     if NR_GPU == 1:
         SimpleFeedfreeTrainer(config).train()
     else:
+        #config.data = StagingInputWrapper(config.data, gpus)
         SyncMultiGPUTrainer(config).train()
