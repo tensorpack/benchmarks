@@ -3,3 +3,4 @@ train_log
 __pycache__
 *.pyc
 *.so
+cifar-10-batches-py
