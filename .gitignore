@@ -1,0 +1,5 @@
+
+train_log
+__pycache__
+*.pyc
+*.so
