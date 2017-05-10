@@ -59,5 +59,5 @@ network = regression(network, optimizer='rmsprop',
 
 # Train using classifier
 model = tflearn.DNN(network, tensorboard_verbose=0)
-model.fit(X, Y, n_epoch=50, shuffle=False, validation_set=(X_test, Y_test),
+model.fit(X, Y, n_epoch=50, shuffle=False,
           show_metric=True, batch_size=32, run_id='cifar10_cnn')

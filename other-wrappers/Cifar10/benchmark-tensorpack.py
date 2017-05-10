@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: UTF-8 -*-
-# File: benchmark-cifar10.py
+# File: benchmark-tensorpack.py
 # Author: Yuxin Wu <ppwwyyxxc@gmail.com>
 import tensorflow as tf
 from tensorpack import *
@@ -67,7 +67,7 @@ def get_data(train_or_test):
     return ds
 
 if __name__ == '__main__':
-    logger.auto_set_dir()
+    logger.auto_set_dir('d')
     dataset_train = get_data('train')
     dataset_test = get_data('test')
     config = TrainConfig(
@@ -75,7 +75,7 @@ if __name__ == '__main__':
         dataflow=dataset_train,
         callbacks=[InferenceRunner(dataset_test, ClassificationError())],
         # keras monitor these two live data during training. do it here (no overhead actually)
-        extra_callbacks=[ProgressBar(['cost', 'train_error']), StatPrinter()],
+        extra_callbacks=[ProgressBar(['cost', 'train_error'])],
         max_epoch=200,
     )
     QueueInputTrainer(config, tf.FIFOQueue(300, [tf.float32, tf.int32])).train()
