@@ -182,4 +182,7 @@ if __name__ == '__main__':
         'ps': ['0.0.0.0:2222'],
         'worker': ['0.0.0.0:2223', '0.0.0.0:2224']
     })
-    DistributedReplicatedTrainer(config, args.job, args.task, cluster_spec).train()
+    server = tf.train.Server(
+        cluster_spec, args.job, args.task, config=get_default_sess_config())
+    DistributedReplicatedTrainer(config, server).train()
+    print("Exit from main")
