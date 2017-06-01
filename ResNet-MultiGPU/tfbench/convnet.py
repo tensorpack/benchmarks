@@ -10,6 +10,7 @@ from tensorflow.python.layers import core as core_layers
 from tensorflow.python.layers import pooling as pooling_layers
 from tensorflow.python.ops import data_flow_ops
 import numpy as np
+import tensorpack
 
 class ConvNetBuilder(object):
   """Builder of cnn net."""
@@ -247,6 +248,7 @@ class ConvNetBuilder(object):
     name = 'batchnorm' + str(self.counts['batchnorm'])
     self.counts['batchnorm'] += 1
 
+    #bn = tensorpack.BatchNorm(name, input_layer, data_format='NCHW')
     with tf.variable_scope(name) as scope:
       bn = tf.contrib.layers.batch_norm(
           input_layer, is_training=self.phase_train,
