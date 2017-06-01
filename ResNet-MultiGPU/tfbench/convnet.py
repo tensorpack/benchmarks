@@ -135,29 +135,6 @@ class ConvNetBuilder(object):
     self.top_layer = pool
     return pool
 
-  def apool(self,
-            k_height,
-            k_width,
-            d_height=2,
-            d_width=2,
-            mode='VALID',
-            input_layer=None,
-            num_channels_in=None):
-    """Construct an average pooling layer."""
-    if input_layer is None:
-      input_layer = self.top_layer
-    else:
-      self.top_size = num_channels_in
-    name = 'apool' + str(self.counts['apool'])
-    self.counts['apool'] += 1
-    pool = pooling_layers.average_pooling2d(
-        input_layer, [k_height, k_width], [d_height, d_width],
-        padding=mode,
-        data_format=self.channel_pos,
-        name=name)
-    self.top_layer = pool
-    return pool
-
   def reshape(self, shape, input_layer=None):
     if input_layer is None:
       input_layer = self.top_layer
@@ -247,44 +224,6 @@ class ConvNetBuilder(object):
       self.top_size = depth
       return output
 
-  def inception_module(self, name, cols, input_layer=None, in_size=None):
-    if input_layer is None:
-      input_layer = self.top_layer
-    if in_size is None:
-      in_size = self.top_size
-    name += str(self.counts[name])
-    self.counts[name] += 1
-    with tf.variable_scope(name):
-      col_layers = []
-      col_layer_sizes = []
-      for c, col in enumerate(cols):
-        col_layers.append([])
-        col_layer_sizes.append([])
-        for l, layer in enumerate(col):
-          ltype, args = layer[0], layer[1:]
-          kwargs = {
-              'input_layer': input_layer,
-              'num_channels_in': in_size
-          } if l == 0 else {}
-          if ltype == 'conv':
-            self.conv(*args, **kwargs)
-          elif ltype == 'mpool':
-            self.mpool(*args, **kwargs)
-          elif ltype == 'apool':
-            self.apool(*args, **kwargs)
-          elif ltype == 'share':  # Share matching layer from previous column
-            self.top_layer = col_layers[c - 1][l]
-            self.top_size = col_layer_sizes[c - 1][l]
-          else:
-            raise KeyError('Invalid layer type for inception module: \'%s\'' %
-                           ltype)
-          col_layers[c].append(self.top_layer)
-          col_layer_sizes[c].append(self.top_size)
-      catdim = 3 if self.data_format == 'NHWC' else 1
-      self.top_layer = tf.concat([layers[-1] for layers in col_layers], catdim)
-      self.top_size = sum([sizes[-1] for sizes in col_layer_sizes])
-      return self.top_layer
-
   def residual(self, nout, net, scale=1.0):
     inlayer = self.top_layer
     net(self)
@@ -298,20 +237,6 @@ class ConvNetBuilder(object):
     self.top_layer = tf.reduce_mean(
         self.top_layer, axes, keep_dims=keep_dims, name=name)
     return self.top_layer
-
-  def dropout(self, keep_prob=0.5, input_layer=None):
-    if input_layer is None:
-      input_layer = self.top_layer
-    else:
-      self.top_size = None
-    name = 'dropout' + str(self.counts['dropout'])
-    with tf.variable_scope(name):
-      if not self.phase_train:
-        keep_prob = 1.0
-      keep_prob_tensor = tf.constant(keep_prob, dtype=self.data_type)
-      dropout = core_layers.dropout(input_layer, keep_prob_tensor)
-      self.top_layer = dropout
-      return dropout
 
   def batch_norm(self, input_layer=None, **kwargs):
     """Adds a Batch Normalization layer."""
