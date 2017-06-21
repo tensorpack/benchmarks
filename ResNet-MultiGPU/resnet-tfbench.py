@@ -144,9 +144,7 @@ def get_data():
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--gpu', help='comma separated list of GPU(s) to use.', required=True)
-    parser.add_argument('--model', choices=['tfbench', 'tensorpack'],
-            required=True)
-    parser.add_argument('--data', help='ILSVRC dataset dir')
+    parser.add_argument('--model', choices=['tfbench', 'tensorpack'], default='tensorpack')
     parser.add_argument('--load', help='load model')
     parser.add_argument('--send', help='', action='store_true')
     parser.add_argument('--data_format', help='specify NCHW or NHWC',
@@ -170,17 +168,16 @@ if __name__ == '__main__':
         steps_per_epoch=50,
         max_epoch=10,
     )
-
-    if args.load:
-        config.session_init = SaverRestore(args.load)
-    config.nr_tower = NR_GPU
-    config.data = QueueInput(config.dataflow)
     gpus = ['/gpu:{}'.format(k) for k in range(NR_GPU)]
     print(gpus)
+
+    config.nr_tower = NR_GPU
+    config.data = QueueInput(config.dataflow)
+
     #config.data = DummyConstantInput([[64, 224,224,3],[64]])
     config.dataflow = None
     if NR_GPU == 1:
         SimpleFeedfreeTrainer(config).train()
     else:
         #config.data = StagingInputWrapper(config.data, gpus)
-        SyncMultiGPUTrainer(config).train()
+        SyncMultiGPUTrainerReplicated(config).train()

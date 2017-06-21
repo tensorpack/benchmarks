@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-# File: test-ilsvrc-speed.py
+# File: benchmark-ImageNet.py
 # Author: Yuxin Wu <ppwwyyxxc@gmail.com>
 
 import cv2
@@ -54,15 +54,19 @@ def dump(dir, name, db):
     class RawILSVRC12(DataFlow):
         def __init__(self):
             meta = dataset.ILSVRCMeta()
-            self.imglist = meta.get_image_list(name)
+            self.imglist = meta.get_image_list(name, dir_structure='train')
             np.random.shuffle(self.imglist)
             self.dir = os.path.join(dir, name)
         def get_data(self):
             for fname, label in self.imglist:
                 fname = os.path.join(self.dir, fname)
+                im = cv2.imread(fname)
+                if im is None:
+                    print(fname)
                 with open(fname, 'rb') as f:
                     jpeg = f.read()
                 jpeg = np.asarray(bytearray(jpeg), dtype='uint8')
+                assert len(jpeg) > 10
                 yield jpeg, label
         def size(self):
             return len(self.imglist)
@@ -86,15 +90,22 @@ def test_lmdb(db, augs, batch=256):
     ds = PrefetchData(ds, 5000, 1)
 
     ds = LMDBDataPoint(ds)
-    ds = MapDataComponent(ds, lambda x: cv2.imdecode(x, cv2.IMREAD_COLOR), 0)
+    def f(x):
+        try:
+            return cv2.imdecode(x, cv2.IMREAD_COLOR)
+        except:
+            print(x)
+            raise
+    ds = MapDataComponent(ds, f, 0)
     ds = AugmentImageComponent(ds, augs)
 
-    ds = PrefetchDataZMQ(ds, 25)
+    ds = PrefetchDataZMQ(ds, 40)
     ds = BatchData(ds, batch)
+    TestDataSpeed(ds, 500000).start_test()
 
-    ds = TestDataSpeed(ds, 500000)
-    ds.start_test()
 
-#dump('/home/wyx/data/imagenet', 'train', '/home/wyx/data/ImageNet-Train.lmdb')
+#dump('/datasets01/imagenet_full_size/061417', 'val',
+        #'/scratch/yuxinwu/Imagenet-Val.lmdb')
 #test_orig('/home/wyx/data/imagenet', 'train', augmentors_small)
-test_lmdb('/home/wyx/data/ImageNet-Train.lmdb', augmentors_small)
+test_lmdb('/checkpoint/yuxinwu/data/Imagenet-Val.lmdb', augmentors_small)
+#test_lmdb('/scratch/yuxinwu/Imagenet-Val.lmdb', augmentors_small)
