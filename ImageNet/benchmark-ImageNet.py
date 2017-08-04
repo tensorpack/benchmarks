@@ -79,7 +79,7 @@ def test_orig(dir, name, augs, batch=256):
     ds = dataset.ILSVRC12(dir, name, shuffle=True)
     ds = AugmentImageComponent(ds, augs)
 
-    ds = PrefetchDataZMQ(ds, 15)
+    ds = PrefetchDataZMQ(ds, 30)
     ds = BatchData(ds, batch)
     ds = TestDataSpeed(ds, 20000)
     ds.start_test()
@@ -106,6 +106,6 @@ def test_lmdb(db, augs, batch=256):
 
 #dump('/datasets01/imagenet_full_size/061417', 'val',
         #'/scratch/yuxinwu/Imagenet-Val.lmdb')
-#test_orig('/home/wyx/data/imagenet', 'train', augmentors_small)
-test_lmdb('/checkpoint/yuxinwu/data/Imagenet-Val.lmdb', augmentors_small)
+test_orig('/datasets01/imagenet_full_size/061417', 'train', augmentors_large)
+#test_lmdb('/checkpoint/yuxinwu/data/Imagenet-Val.lmdb', augmentors_small)
 #test_lmdb('/scratch/yuxinwu/Imagenet-Val.lmdb', augmentors_small)

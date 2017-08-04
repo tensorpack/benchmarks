@@ -143,7 +143,7 @@ def get_data():
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--gpu', help='comma separated list of GPU(s) to use.', required=True)
+    parser.add_argument('--gpu', help='comma separated list of GPU(s) to use.')
     parser.add_argument('--model', choices=['tfbench', 'tensorpack'], default='tensorpack')
     parser.add_argument('--load', help='load model')
     parser.add_argument('--send', help='', action='store_true')
@@ -155,10 +155,9 @@ if __name__ == '__main__':
         send_dataflow_zmq(d, 'ipc://ipcpipe', format='op')
         sys.exit()
 
-    os.environ['CUDA_VISIBLE_DEVICES'] = args.gpu
-    NR_GPU = len(args.gpu.split(','))
-
-    logger.auto_set_dir('d')
+    if args.gpu:
+        os.environ['CUDA_VISIBLE_DEVICES'] = args.gpu
+    NR_GPU = get_nr_gpu()
 
     M = TFBenchModel if args.model == 'tfbench' else TensorpackModel
     config = TrainConfig(
@@ -167,17 +166,16 @@ if __name__ == '__main__':
         callbacks=[ ],
         steps_per_epoch=50,
         max_epoch=10,
+        nr_tower=NR_GPU
     )
     gpus = ['/gpu:{}'.format(k) for k in range(NR_GPU)]
     print(gpus)
 
-    config.nr_tower = NR_GPU
     config.data = QueueInput(config.dataflow)
-
     #config.data = DummyConstantInput([[64, 224,224,3],[64]])
     config.dataflow = None
     if NR_GPU == 1:
         SimpleFeedfreeTrainer(config).train()
     else:
         #config.data = StagingInputWrapper(config.data, gpus)
-        SyncMultiGPUTrainerReplicated(config).train()
+        SyncMultiGPUTrainerParameterServer(config).train()

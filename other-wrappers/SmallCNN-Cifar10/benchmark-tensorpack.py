@@ -75,7 +75,7 @@ if __name__ == '__main__':
         dataflow=dataset_train,
         callbacks=[InferenceRunner(dataset_test, ClassificationError())],
         # keras monitor these two live data during training. do it here (no overhead actually)
-        extra_callbacks=[ProgressBar(['cost', 'train_error'])],
+        extra_callbacks=[ProgressBar(['cost', 'train_error']), MergeAllSummaries()],
         max_epoch=200,
     )
     QueueInputTrainer(config, tf.FIFOQueue(300, [tf.float32, tf.int32])).train()
