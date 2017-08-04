@@ -13,13 +13,17 @@ It is meant to be an equivalent of the official keras example at:
 https://github.com/fchollet/keras/blob/master/examples/cifar10_cnn.py
 with its `data_augmentation` option set to False (so that we only compare the training).
 
-On machine with TitanX(old) + TensorFlow 1.0 + cuda 7.5 + cudnn v5,
-this script takes 8 seconds per epoch.
+On machine with Tesla M40 + TensorFlow 1.3.0rc1 + cuda 8.0 + cudnn v6,
+this script takes 8.5 seconds per epoch.
 
-Keras with TensorFlow backend takes 16 seconds per epoch,
+Keras with TensorFlow backend takes 14 seconds per epoch,
 tflearn takes 14 seconds per epoch.
 
-I expect a larger performance gap on larger datasets & faster GPUs.
+Note that this CNN is too small to fully utilize GPU, and the datasets are
+too small to show any copy latency.
+Therefore the advantage of tensorpack cannot be fully demonstrated.
+
+I expect a larger performance gap on larger datasets & larger networks.
 """
 
 class Model(ModelDesc):
