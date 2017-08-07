@@ -178,4 +178,4 @@ if __name__ == '__main__':
         SimpleFeedfreeTrainer(config).train()
     else:
         #config.data = StagingInputWrapper(config.data, gpus)
-        SyncMultiGPUTrainerParameterServer(config).train()
+        SyncMultiGPUTrainerReplicated(config, gpu_prefetch=False).train()
