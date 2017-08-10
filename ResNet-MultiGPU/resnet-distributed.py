@@ -145,16 +145,11 @@ if __name__ == '__main__':
     parser.add_argument('--model', choices=['tfbench', 'tensorpack'], default='tensorpack')
     parser.add_argument('--data', help='ILSVRC dataset dir')
     parser.add_argument('--load', help='load model')
-    parser.add_argument('--send', help='', action='store_true')
     parser.add_argument('--job', required=True)
     parser.add_argument('--task', default=0, type=int)
     parser.add_argument('--data_format', help='specify NCHW or NHWC',
                         type=str, default='NCHW')
     args = parser.parse_args()
-    if args.send:
-        d = get_data()
-        send_dataflow_zmq(d, 'ipc://ipcpipe', format='op')
-        sys.exit()
 
     os.environ['CUDA_VISIBLE_DEVICES'] = args.gpu
     NR_GPU = len(args.gpu.split(','))
@@ -176,11 +171,13 @@ if __name__ == '__main__':
 
     #config.data = QueueInput(config.dataflow)
     config.data = DummyConstantInput([[64, 224,224,3],[64]])
-    #config.dataflow = None
+    config.dataflow = None
 
+
+    hs = ['h1', 'h2']
     cluster_spec = tf.train.ClusterSpec({
-        'ps': ['0.0.0.0:2222'],
-        'worker': ['0.0.0.0:2223', '0.0.0.0:2224']
+        'ps': [k + ':2222' for k in hs],
+        'worker': [k + ':2223' for k in hs]
     })
     server = tf.train.Server(
         cluster_spec, args.job, args.task, config=get_default_sess_config())

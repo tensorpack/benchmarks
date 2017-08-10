@@ -105,38 +105,25 @@ def test_lmdb(db, augs, batch=256):
     ds = BatchData(ds, batch)
     TestDataSpeed(ds, 500000).start_test()
 
-class ILSVRCNames(DataFlow):
-    def __init__(self):
-        self.lst = dataset.ILSVRCMeta().get_image_list('val', 'train')
-        self.dir = '/datasets01/imagenet_full_size/061417/val'
-    def size(self):
-        return len(self.lst)
-    def get_data(self):
-        for fname, cls in self.lst:
-            fname = os.path.join(self.dir, fname)
-            yield fname, cls
-
 
 def test_inference(dir, name, augs, batch=128):
     #ds = dataset.ILSVRC12(dir, name, shuffle=True, dir_structure='train')
-    ds = ILSVRCNames()
+    ds = dataset.ILSVRC12Files(dir, name, shuffle=False, dir_structure='train')
 
     aug = imgaug.AugmentorList(augs)
     def mapf(dp):
         fname, cls = dp
         im = cv2.imread(fname, cv2.IMREAD_COLOR)
-        if im.ndim == 2:
-            im = np.expand_dims(im, 2).repeat(3, 2)
         im = aug.augment(im)
         return im, cls
-    ds = ThreadedMapData(ds, 30, mapf, buffer_size=1000, strict=True)
+    ds = ThreadedMapData(ds, 30, mapf, buffer_size=2000, strict=True)
     ds = BatchData(ds, batch)
     ds = PrefetchDataZMQ(ds, 1)
     TestDataSpeed(ds).start_test()
 
 #dump('/datasets01/imagenet_full_size/061417', 'val',
         #'/scratch/yuxinwu/Imagenet-Val.lmdb')
-#test_orig('/datasets01/imagenet_full_size/061417', 'train', augmentors_large)
+test_orig('/datasets01/imagenet_full_size/061417', 'train', augmentors_large)
 #test_lmdb('/checkpoint/yuxinwu/data/Imagenet-Val.lmdb', augmentors_small)
 #test_lmdb('/scratch/yuxinwu/Imagenet-Val.lmdb', augmentors_small)
 test_inference('/datasets01/imagenet_full_size/061417/', 'val',
