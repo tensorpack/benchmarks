@@ -174,12 +174,12 @@ if __name__ == '__main__':
     config.dataflow = None
 
 
-    hs = ['h1', 'h2']
+    hs = ['localhost', 'localhost']
     cluster_spec = tf.train.ClusterSpec({
         'ps': [k + ':2222' for k in hs],
         'worker': [k + ':2223' for k in hs]
     })
     server = tf.train.Server(
         cluster_spec, args.job, args.task, config=get_default_sess_config())
-    DistributedReplicatedTrainer(config, server).train()
+    DistributedTrainerReplicated(config, server).train()
     print("Exit from main")

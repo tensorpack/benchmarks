@@ -58,8 +58,6 @@ class TFBenchModel(Model):
         add_moving_summary(tf.reduce_mean(wrong, name='train-error-top1'))
         wrong = prediction_incorrect(logits, label, 5, name='wrong-top5')
         add_moving_summary(tf.reduce_mean(wrong, name='train-error-top5'))
-        #wd_cost = regularize_cost('.*/W', l2_regularizer(1e-4), name='l2_regularize_loss')
-        #add_moving_summary(loss, wd_cost)
         wd_cost = 0.0
         self.cost = tf.add_n([loss, wd_cost], name='cost')
 
@@ -113,9 +111,6 @@ class TensorpackModel(Model):
                 argscope([Conv2D, MaxPooling, GlobalAvgPooling, BatchNorm], data_format=self.data_format):
             logits = (LinearWrap(image)
                       .Conv2D('conv0', 64, 7, stride=2, nl=BNReLU)
-                      #())
-            #self.cost = tf.reduce_mean(logits)
-            #return
                       .MaxPooling('pool0', shape=3, stride=2, padding='SAME')
                       .apply(layer, 'group0', block_func, 64, defs[0], 1, first=True)
                       .apply(layer, 'group1', block_func, 128, defs[1], 2)
