@@ -1,19 +1,19 @@
 
-## Benchmark tensorpack with other TF wrappers
+## Benchmark CNN with other TF wrappers
 
 Each subdirectory contains a group of test scripts.
 
-Environment: TF1.3.0rc1, Single Tesla M40, cudnn6.0.
+Environment: TF1.3.0, Single Tesla M40, cudnn6.0. Tested on 09/26/2017.
 
-They are trained with same configurations.  Speed is measured by images per second.
+Speed is measured by images per second.
 
 | Task											  | tensorpack	 | Keras	  | tflearn  |
 | --------------------------- | ------------ | ------   | -------  |
-| Small CNN on Cifar10 			  |		5885       | 3571     | 3571     |
-| VGG on fake ImageNet			  |		74				 | 49				| 49       |
-| AlexNet on fake ImageNet	  |		1212			 | 711			| didn't test|
+| Small CNN on Cifar10 			  |		__5364__   | 3571     | 3571     |
+| VGG on fake ImageNet			  |		__74__		 | 49				| 49       |
+| AlexNet on fake ImageNet	  |		__1207__	 | 711			| didn't test|
 
-Note that the first-epoch is taken as warmup and not considered in timing.
+Note that the first-epoch is warmup and is not considered in timing.
 
 I would hope to benchmark on real ImageNet, but sadly I couldn't find any
 working training code on ImageNet with Keras/tflearn.
