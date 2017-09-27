@@ -45,9 +45,7 @@ class Model(ModelDesc):
                       .MaxPooling('pool5', 2)
                       # 7
                       .FullyConnected('fc6', 4096, nl=tf.nn.relu)
-                      .Dropout('drop0', 0.5)
                       .FullyConnected('fc7', 4096, nl=tf.nn.relu)
-                      .Dropout('drop1', 0.5)
                       .FullyConnected('fc8', out_dim=1000, nl=tf.identity)())
 
         cost = tf.nn.sparse_softmax_cross_entropy_with_logits(logits=logits, labels=label)
@@ -59,8 +57,7 @@ class Model(ModelDesc):
 
     def _get_optimizer(self):
         # keras default is 1e-3
-        lr = symbf.get_scalar_var('learning_rate', 1e-3, summary=True)
-        return tf.train.RMSPropOptimizer(lr, epsilon=1e-8)
+        return tf.train.RMSPropOptimizer(1e-3, epsilon=1e-8)
 
 
 def get_data(train_or_test):

@@ -13,7 +13,11 @@ Speed is measured by images per second.
 | VGG on fake ImageNet			  |		__74__		 | 49				| 49       |
 | AlexNet on fake ImageNet	  |		__1207__	 | 711			| didn't test|
 
-Note that the first-epoch is warmup and is not considered in timing.
+Note:
+
+1. The first-epoch is warmup and is not considered in timing.
+2. tensorpack uses NCHW format as suggested by TensorFlow, while the Keras experiements are in 'channels_last' format.
+	 I tried 'channels_first' in VGG but only got worse performance for unknown reason.
 
 I would hope to benchmark on real ImageNet, but sadly I couldn't find any
 working training code on ImageNet with Keras/tflearn.

@@ -76,4 +76,4 @@ model.compile(loss='categorical_crossentropy',
               optimizer='rmsprop',
               metrics=['accuracy'])
 
-model.fit_generator(gen(), nb_epoch=nb_epoch, steps_per_epoch=50)
+model.fit_generator(gen(), epochs=nb_epoch, steps_per_epoch=50)
