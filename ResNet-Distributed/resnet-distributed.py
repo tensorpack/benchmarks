@@ -136,14 +136,10 @@ class TensorpackModel(Model):
         self.cost = tf.add_n([loss, wd_cost], name='cost')
 
 
-def get_data():
-    return FakeData([[64, 224, 224, 3], [64]], 1000, random=False, dtype='float32')
-
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--gpu', help='comma separated list of GPU(s) to use.', required=True)
     parser.add_argument('--model', choices=['tfbench', 'tensorpack'], default='tensorpack')
-    parser.add_argument('--data', help='ILSVRC dataset dir')
     parser.add_argument('--load', help='load model')
     parser.add_argument('--job', required=True)
     parser.add_argument('--task', default=0, type=int)
@@ -154,12 +150,9 @@ if __name__ == '__main__':
     os.environ['CUDA_VISIBLE_DEVICES'] = args.gpu
     NR_GPU = len(args.gpu.split(','))
 
-    logger.auto_set_dir('k')
-
     M = TFBenchModel if args.model == 'tfbench' else TensorpackModel
     config = TrainConfig(
         model=M(data_format=args.data_format),
-        dataflow=get_data(),
         callbacks=[ ],
         steps_per_epoch=50,
         max_epoch=10,
@@ -169,8 +162,9 @@ if __name__ == '__main__':
         config.session_init = SaverRestore(args.load)
     config.nr_tower = NR_GPU
 
-    #config.data = QueueInput(config.dataflow)
-    config.data = DummyConstantInput([[64, 224,224,3],[64]])
+    dataflow = FakeData([[64, 224, 224, 3], [64]], 1000, random=False, dtype='float32')
+    config.data = QueueInput(config.dataflow)
+    #config.data = DummyConstantInput([[64, 224,224,3],[64]])
     config.dataflow = None
 
 
@@ -182,4 +176,3 @@ if __name__ == '__main__':
     server = tf.train.Server(
         cluster_spec, args.job, args.task, config=get_default_sess_config())
     DistributedTrainerReplicated(config, server).train()
-    print("Exit from main")
