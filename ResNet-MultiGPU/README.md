@@ -8,6 +8,7 @@ Their performance should be the same.
 ## Test environment:
 * TF Version: v1.3.0-rc1-1302-g593dc8e
 * Machine: Nvidia DGX1
+
 Note that these experiements are run on machines of the same configurations,
 but not the same set of physical machines. So expect some variance in results.
 
