@@ -1,7 +1,7 @@
 
 ## DCGAN
+Environment: TFv1.3.0-rc1-1302-g593dc8e. Tesla P100.
 
-Environment: TF1.3. Tesla P100.
 Code: [DCGAN-tensorflow](https://github.com/carpedm20/DCGAN-tensorflow/) at commit b13830.
 
 * DCGAN-tensorflow:
@@ -12,7 +12,7 @@ This command takes 0.36s per iteration, where each iteration is 1 update to D an
 
 * [tensorpack DCGAN examples](https://github.com/ppwwyyxx/tensorpack/blob/master/examples/GAN/DCGAN.py):
 
-Apply the following diff to make a fair comparison:
+Apply the following diff on DCGAN.py to make a fair comparison:
 ```diff
 18c18
 < from GAN import SeparateGANTrainer, RandomZData, GANModelDesc

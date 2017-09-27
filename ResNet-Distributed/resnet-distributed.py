@@ -163,15 +163,18 @@ if __name__ == '__main__':
     config.nr_tower = NR_GPU
 
     dataflow = FakeData([[64, 224, 224, 3], [64]], 1000, random=False, dtype='float32')
-    config.data = QueueInput(config.dataflow)
+    config.data = QueueInput(dataflow)
     #config.data = DummyConstantInput([[64, 224,224,3],[64]])
-    config.dataflow = None
 
 
     hs = ['localhost', 'localhost']
+    #cluster_spec = tf.train.ClusterSpec({
+        #'ps': [k + ':2222' for k in hs],
+        #'worker': [k + ':2223' for k in hs]
+    #})
     cluster_spec = tf.train.ClusterSpec({
-        'ps': [k + ':2222' for k in hs],
-        'worker': [k + ':2223' for k in hs]
+            'ps': ['localhost:2222', 'localhost:2232'],
+            'worker': ['localhost:2223', 'localhost:2233']
     })
     server = tf.train.Server(
         cluster_spec, args.job, args.task, config=get_default_sess_config())
