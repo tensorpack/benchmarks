@@ -13,6 +13,7 @@ import tensorflow as tf
 from tensorflow.contrib.layers import variance_scaling_initializer
 from tensorpack import *
 from tensorpack.utils.stats import RatioCounter
+from tensorpack.utils.gpu import get_nr_gpu
 from tensorpack.tfutils.symbolic_functions import *
 from tensorpack.tfutils.summary import *
 
@@ -33,7 +34,7 @@ class Model(ModelDesc):
 
     def _get_optimizer(self):
         lr = get_scalar_var('learning_rate', 0.1, summary=True)
-        return tf.train.MomentumOptimizer(lr, 0.9, use_nesterov=True)
+        return tf.train.GradientDescentOptimizer(lr)
 
 
 class TFBenchModel(Model):
@@ -54,15 +55,14 @@ class TFBenchModel(Model):
 
         loss = tf.nn.sparse_softmax_cross_entropy_with_logits(logits=logits, labels=label)
         loss = tf.reduce_mean(loss, name='xentropy-loss')
-        wrong = prediction_incorrect(logits, label, 1, name='wrong-top1')
-        add_moving_summary(tf.reduce_mean(wrong, name='train-error-top1'))
-        wrong = prediction_incorrect(logits, label, 5, name='wrong-top5')
-        add_moving_summary(tf.reduce_mean(wrong, name='train-error-top5'))
-        wd_cost = 0.0
+        wd_cost = regularize_cost('.*', tf.contrib.layers.l2_regularizer(1e-4))
         self.cost = tf.add_n([loss, wd_cost], name='cost')
 
 
 class TensorpackModel(Model):
+    """
+    Implement the same model with tensorpack layers.
+    """
     def _build_graph(self, inputs):
         image, label = inputs
         image = tf.cast(image, tf.float32) * (1.0 / 255)
@@ -122,55 +122,68 @@ class TensorpackModel(Model):
         loss = tf.nn.sparse_softmax_cross_entropy_with_logits(logits=logits, labels=label)
         loss = tf.reduce_mean(loss, name='xentropy-loss')
 
-        wrong = prediction_incorrect(logits, label, 1, name='wrong-top1')
-        add_moving_summary(tf.reduce_mean(wrong, name='train-error-top1'))
-
-        wrong = prediction_incorrect(logits, label, 5, name='wrong-top5')
-        add_moving_summary(tf.reduce_mean(wrong, name='train-error-top5'))
-
         wd_cost = regularize_cost('.*/W', l2_regularizer(1e-4), name='l2_regularize_loss')
         add_moving_summary(loss, wd_cost)
         self.cost = tf.add_n([loss, wd_cost], name='cost')
 
 
-def get_data():
-    return FakeData([[64, 224, 224, 3], [64]], 1000, random=False, dtype='float32')
-
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--gpu', help='comma separated list of GPU(s) to use.')
-    parser.add_argument('--model', choices=['tfbench', 'tensorpack'], default='tensorpack')
+    parser.add_argument('--model', choices=['tfbench', 'tensorpack'], default='tfbench')
     parser.add_argument('--load', help='load model')
-    parser.add_argument('--send', help='', action='store_true')
     parser.add_argument('--data_format', help='specify NCHW or NHWC',
                         type=str, default='NCHW')
+    parser.add_argument('--fake-location', help='the place to create fake data',
+                        type=str, default='gpu', choices=['cpu', 'gpu', 'python'])
+    parser.add_argument('--variable_update', help='variable update strategy',
+                        type=str, choices=['replicated', 'parameter_server'],
+                        required=True)
     args = parser.parse_args()
-    if args.send:
-        d = get_data()
-        send_dataflow_zmq(d, 'ipc://ipcpipe', format='op')
-        sys.exit()
 
     if args.gpu:
         os.environ['CUDA_VISIBLE_DEVICES'] = args.gpu
     NR_GPU = get_nr_gpu()
+    devices = ['/gpu:{}'.format(k) for k in range(NR_GPU)]
 
     M = TFBenchModel if args.model == 'tfbench' else TensorpackModel
     config = TrainConfig(
         model=M(data_format=args.data_format),
-        dataflow=get_data(),
         callbacks=[ ],
-        steps_per_epoch=50,
+        steps_per_epoch=100,
         max_epoch=10,
         nr_tower=NR_GPU
     )
-    gpus = ['/gpu:{}'.format(k) for k in range(NR_GPU)]
-    print(gpus)
 
-    config.data = QueueInput(config.dataflow)
-    #config.data = DummyConstantInput([[64, 224,224,3],[64]])
-    config.dataflow = None
-    if NR_GPU == 1:
-        SimpleFeedfreeTrainer(config).train()
+    input_shape = [64, 224, 224, 3]
+    label_shape = [64]
+    if args.fake_location == 'gpu':
+        config.data = DummyConstantInput([input_shape, label_shape])
+    elif args.fake_location == 'cpu':
+        def fn():
+            # these copied from tensorflow/benchmarks
+            with tf.device('/cpu:0'):
+                images = tf.truncated_normal(
+                    input_shape, dtype=tf.float32, stddev=1e-1, name='synthetic_images')
+                labels = tf.random_uniform(
+                    label_shape, minval=1, maxval=1000, dtype=tf.int32, name='synthetic_labels')
+                images = tf.contrib.framework.local_variable(images, name='images')
+                labels = tf.contrib.framework.local_variable(labels, name='labels')
+                return [images, labels]
+        config.data = TensorInput(fn)
     else:
-        #config.data = StagingInputWrapper(config.data, gpus)
-        SyncMultiGPUTrainerReplicated(config, gpu_prefetch=False).train()
+        dataflow = FakeData([input_shape, label_shape], 1000, random=False, dtype='float32')
+        # our training is quite fast, so we stage more data than default
+        config.data = QueueInput(dataflow)
+        config.data = StagingInputWrapper(
+            config.data, devices, nr_stage=max(2 * NR_GPU, 5))
+
+    if NR_GPU == 1:
+        SimpleTrainer(config).train()
+    else:
+        # we already handle gpu_prefetch above manually.
+        if args.variable_update == 'replicated':
+            trainer = SyncMultiGPUTrainerReplicated(config, gpu_prefetch=False)
+        else:
+            trainer = SyncMultiGPUTrainerParameterServer(config, gpu_prefetch=False, ps_device='cpu')
+        trainer.train()
