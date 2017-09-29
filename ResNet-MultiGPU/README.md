@@ -2,7 +2,7 @@
 # Benchmark MultiGPU training against tensorflow/benchmarks
 
 tensorpack MultiGPU trainers are implemented following the awesome examples in
-[tensorflow/benchmarks](github.com/tensorflow/benchmarks).
+[tensorflow/benchmarks](https://github.com/tensorflow/benchmarks).
 Their performance should be the same.
 
 ## Test environment:
