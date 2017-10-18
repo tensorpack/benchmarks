@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: UTF-8 -*-
-# File: resnet-tfbench.py
+# File: resnet-multigpu.py
 
 import cv2
 import sys
@@ -144,7 +144,6 @@ if __name__ == '__main__':
     if args.gpu:
         os.environ['CUDA_VISIBLE_DEVICES'] = args.gpu
     NR_GPU = get_nr_gpu()
-    devices = ['/gpu:{}'.format(k) for k in range(NR_GPU)]
 
     M = TFBenchModel if args.model == 'tfbench' else TensorpackModel
     config = TrainConfig(
@@ -176,7 +175,7 @@ if __name__ == '__main__':
         # our training is quite fast, so we stage more data than default
         config.data = QueueInput(dataflow)
         config.data = StagingInputWrapper(
-            config.data, devices, nr_stage=max(2 * NR_GPU, 5))
+            config.data, range(NR_GPU), nr_stage=max(2 * NR_GPU, 5))
 
     if NR_GPU == 1:
         SimpleTrainer(config).train()
