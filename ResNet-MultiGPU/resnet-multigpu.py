@@ -137,7 +137,7 @@ if __name__ == '__main__':
     parser.add_argument('--fake-location', help='the place to create fake data',
                         type=str, default='gpu', choices=['cpu', 'gpu', 'python'])
     parser.add_argument('--variable_update', help='variable update strategy',
-                        type=str, choices=['replicated', 'parameter_server'],
+                        type=str, choices=['replicated', 'parameter_server', 'horovod'],
                         required=True)
     args = parser.parse_args()
 
@@ -151,7 +151,6 @@ if __name__ == '__main__':
         callbacks=[ ],
         steps_per_epoch=100,
         max_epoch=10,
-        nr_tower=NR_GPU
     )
 
     input_shape = [64, 224, 224, 3]
@@ -178,11 +177,12 @@ if __name__ == '__main__':
             config.data, range(NR_GPU), nr_stage=max(2 * NR_GPU, 5))
 
     if NR_GPU == 1:
-        SimpleTrainer(config).train()
+        trainer = SimpleTrainer()
     else:
+        trainer = {
+            'replicated': SyncMultiGPUTrainerReplicated(NR_GPU),
+            'horovod': HorovodTrainer(),
+            'parameter_server': SyncMultiGPUTrainerParameterServer(NR_GPU, ps_device='cpu')
+        }[args.variable_update]
         # we already handle gpu_prefetch above manually.
-        if args.variable_update == 'replicated':
-            trainer = SyncMultiGPUTrainerReplicated(config, gpu_prefetch=False)
-        else:
-            trainer = SyncMultiGPUTrainerParameterServer(config, gpu_prefetch=False, ps_device='cpu')
-        trainer.train()
+    launch_train_with_config(config, trainer)

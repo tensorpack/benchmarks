@@ -60,7 +60,7 @@ class Model(ModelDesc):
 
     def _get_optimizer(self):
         # keras default is 1e-3
-        lr = symbf.get_scalar_var('learning_rate', 1e-3, summary=True)
+        lr = tf.get_variable('learning_rate', initializer=1e-3, trainable=False)
         return tf.train.RMSPropOptimizer(lr, epsilon=1e-8)
 
 
@@ -76,10 +76,11 @@ if __name__ == '__main__':
     dataset_test = get_data('test')
     config = TrainConfig(
         model=Model(),
-        dataflow=dataset_train,
+        data=QueueInput(dataset_train,
+                        queue=tf.FIFOQueue(300, [tf.float32, tf.int32])),
         callbacks=[InferenceRunner(dataset_test, ClassificationError())],
         # keras monitor these two live data during training. do it here (no overhead actually)
         extra_callbacks=[ProgressBar(['cost', 'train_error']), MergeAllSummaries()],
         max_epoch=200,
     )
-    QueueInputTrainer(config, tf.FIFOQueue(300, [tf.float32, tf.int32])).train()
+    launch_train_with_config(config, SimpleTrainer())

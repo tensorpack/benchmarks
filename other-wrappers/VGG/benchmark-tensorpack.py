@@ -68,11 +68,13 @@ if __name__ == '__main__':
     dataset_train = get_data('train')
     config = TrainConfig(
         model=Model(),
-        dataflow=dataset_train,
+        data=QueueInput(
+            dataset_train,
+            queue=tf.FIFOQueue(300, [tf.float32, tf.int32])),
         callbacks=[],
         # keras monitor these two live data during training. do it here (no overhead actually)
         extra_callbacks=[ProgressBar(['cost', 'train_error'])],
         max_epoch=200,
         steps_per_epoch=50,
     )
-    QueueInputTrainer(config, tf.FIFOQueue(300, [tf.float32, tf.int32])).train()
+    launch_train_with_config(config, SimpleTrainer())
