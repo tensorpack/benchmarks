@@ -180,9 +180,9 @@ if __name__ == '__main__':
         trainer = SimpleTrainer()
     else:
         trainer = {
-            'replicated': SyncMultiGPUTrainerReplicated(NR_GPU),
-            'horovod': HorovodTrainer(),
-            'parameter_server': SyncMultiGPUTrainerParameterServer(NR_GPU, ps_device='cpu')
-        }[args.variable_update]
+            'replicated': lambda: SyncMultiGPUTrainerReplicated(NR_GPU),
+            'horovod': lambda: HorovodTrainer(),
+            'parameter_server': lambda: SyncMultiGPUTrainerParameterServer(NR_GPU, ps_device='cpu')
+        }[args.variable_update]()
         # we already handle gpu_prefetch above manually.
     launch_train_with_config(config, trainer)
