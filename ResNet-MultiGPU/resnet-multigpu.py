@@ -136,7 +136,7 @@ if __name__ == '__main__':
                         type=str, default='NCHW')
     parser.add_argument('--fake-location', help='the place to create fake data',
                         type=str, default='gpu', choices=['cpu', 'gpu', 'python'])
-    parser.add_argument('--variable_update', help='variable update strategy',
+    parser.add_argument('--variable-update', help='variable update strategy',
                         type=str, choices=['replicated', 'parameter_server', 'horovod'],
                         required=True)
     args = parser.parse_args()

@@ -21,7 +21,7 @@ python tf_cnn_benchmarks.py --num_gpus=8 --batch_size=64 --model=resnet50 --vari
 
 is roughly the same as this tensorpack script:
 ```
-python resnet-multigpu.py --fake-location gpu/cpu/python --variable_update=replicated/parameter_server
+python resnet-multigpu.py --fake-location gpu/cpu/python --variable-update=replicated/parameter_server
 ```
 
 There are tiny differences in the way data is synthesized (the `--fake-location` option):
@@ -33,7 +33,7 @@ This is the recommended experiement setting in tensorpack, because it's easy to 
 
 ## Performance (image/second):
 
-variable_update=replicated:
+variable-update=replicated:
 
 | #GPU			| tensorpack(GPU/CPU/Python) | tensorflow/benchmarks |
 | --------- | ----------------------	| --------------------  |
@@ -43,7 +43,7 @@ variable_update=replicated:
 | 8					|	1612/1579/1551					|	1580.58								|
 
 
-variable_update=parameter_server:
+variable-update=parameter_server:
 
 | #GPU			| tensorpack(GPU/CPU/Python) | tensorflow/benchmarks  |
 | --------- | -------------------				 | --------------------   |
