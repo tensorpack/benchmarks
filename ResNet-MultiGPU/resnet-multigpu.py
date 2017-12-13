@@ -12,6 +12,7 @@ import multiprocessing
 import tensorflow as tf
 from tensorflow.contrib.layers import variance_scaling_initializer
 from tensorpack import *
+from tensorpack.train import HorovodTrainer
 from tensorpack.utils.stats import RatioCounter
 from tensorpack.utils.gpu import get_nr_gpu
 from tensorpack.tfutils.symbolic_functions import *
@@ -172,6 +173,9 @@ if __name__ == '__main__':
     else:
         dataflow = FakeData([input_shape, label_shape], 1000, random=False, dtype='float32')
         # our training is quite fast, so we stage more data than default
+        #ds = TFDatasetInput.dataflow_to_dataset(dataflow, [tf.float32, tf.int32])
+        #ds = ds.prefetch(30)
+        #config.data = TFDatasetInput(ds)
         config.data = QueueInput(dataflow)
         config.data = StagingInputWrapper(
             config.data, range(NR_GPU), nr_stage=max(2 * NR_GPU, 5))
