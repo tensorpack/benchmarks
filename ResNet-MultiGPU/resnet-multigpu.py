@@ -18,7 +18,7 @@ from tensorpack.utils.gpu import get_nr_gpu
 from tensorpack.tfutils.symbolic_functions import *
 from tensorpack.tfutils.summary import *
 
-from tfbench.convnet import ConvNetBuilder
+from tfbench.convnet_builder import ConvNetBuilder
 from tfbench import model_config
 
 INPUT_SHAPE = 224
