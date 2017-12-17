@@ -48,8 +48,12 @@ class TFBenchModel(Model):
         if self.data_format == 'NCHW':
             image = tf.transpose(image, [0, 3, 1, 2])
 
-        network = ConvNetBuilder(image, 3, True, data_format=self.data_format)
-        model_conf = model_config.get_model_config('resnet50')
+        network = ConvNetBuilder(
+            image, 3, True, True, data_format=self.data_format,
+            dtype=tf.float32, variable_dtype=tf.float32)
+        dataset = lambda: 1
+        dataset.name = 'imagenet'
+        model_conf = model_config.get_model_config('resnet50', dataset)
         model_conf.set_batch_size(64)
         model_conf.add_inference(network)
         logits = network.affine(1000, activation='linear')

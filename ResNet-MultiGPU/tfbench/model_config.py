@@ -19,60 +19,43 @@
 from . import resnet_model
 
 
-def get_model_config(model):
+_model_name_to_imagenet_model = {
+    'resnet50': resnet_model.create_resnet50_model,
+    'resnet50_v2': resnet_model.create_resnet50_v2_model,
+    'resnet101': resnet_model.create_resnet101_model,
+    'resnet101_v2': resnet_model.create_resnet101_v2_model,
+    'resnet152': resnet_model.create_resnet152_model,
+    'resnet152_v2': resnet_model.create_resnet152_v2_model,
+}
+
+
+_model_name_to_cifar_model = {
+}
+
+
+def _get_model_map(dataset_name):
+  if 'cifar10' == dataset_name:
+    return _model_name_to_cifar_model
+  elif dataset_name in ('imagenet', 'synthetic'):
+    return _model_name_to_imagenet_model
+  else:
+    raise ValueError('Invalid dataset name: %s' % dataset_name)
+
+
+def get_model_config(model_name, dataset):
   """Map model name to model network configuration."""
-  if model == 'vgg11':
-    mc = vgg_model.Vgg11Model()
-  elif model == 'vgg16':
-    mc = vgg_model.Vgg16Model()
-  elif model == 'vgg19':
-    mc = vgg_model.Vgg19Model()
-  elif model == 'lenet':
-    mc = lenet_model.Lenet5Model()
-  elif model == 'googlenet':
-    mc = googlenet_model.GooglenetModel()
-  elif model == 'overfeat':
-    mc = overfeat_model.OverfeatModel()
-  elif model == 'alexnet':
-    mc = alexnet_model.AlexnetModel()
-  elif model == 'trivial':
-    mc = trivial_model.TrivialModel()
-  elif model == 'inception3':
-    mc = inception_model.Inceptionv3Model()
-  elif model == 'inception4':
-    mc = inception_model.Inceptionv4Model()
-  elif model == 'resnet50' or model == 'resnet50_v2':
-    mc = resnet_model.ResnetModel(model, (3, 4, 6, 3))
-  elif model == 'resnet101' or model == 'resnet101_v2':
-    mc = resnet_model.ResnetModel(model, (3, 4, 23, 3))
-  elif model == 'resnet152' or model == 'resnet152_v2':
-    mc = resnet_model.ResnetModel(model, (3, 8, 36, 3))
+  model_map = _get_model_map(dataset.name)
+  if model_name not in model_map:
+    raise ValueError('Invalid model name \'%s\' for dataset \'%s\'' %
+                     (model_name, dataset.name))
   else:
-    raise KeyError('Invalid model name \'%s\' for dataset \'%s\'' %
-                   (model, dataset.name))
-  return mc
+    return model_map[model_name]()
 
 
-def get_cifar10_model_config(model):
-  """Map model name to model network configuration for cifar10 dataset."""
-  if model == 'alexnet':
-    mc = alexnet_model.AlexnetCifar10Model()
-  elif model == 'resnet20' or model == 'resnet20_v2':
-    mc = resnet_model.ResnetCifar10Model(model, (3, 3, 3))
-  elif model == 'resnet32' or model == 'resnet32_v2':
-    mc = resnet_model.ResnetCifar10Model(model, (5, 5, 5))
-  elif model == 'resnet44' or model == 'resnet44_v2':
-    mc = resnet_model.ResnetCifar10Model(model, (7, 7, 7))
-  elif model == 'resnet56' or model == 'resnet56_v2':
-    mc = resnet_model.ResnetCifar10Model(model, (9, 9, 9))
-  elif model == 'resnet110' or model == 'resnet110_v2':
-    mc = resnet_model.ResnetCifar10Model(model, (18, 18, 18))
-  elif model == 'densenet40_k12':
-    mc = densenet_model.DensenetCifar10Model(model, (12, 12, 12), 12)
-  elif model == 'densenet100_k12':
-    mc = densenet_model.DensenetCifar10Model(model, (32, 32, 32), 12)
-  elif model == 'densenet100_k24':
-    mc = densenet_model.DensenetCifar10Model(model, (32, 32, 32), 24)
-  else:
-    raise KeyError('Invalid model name \'%s\' for Cifar10 DataSet.' % model)
-  return mc
+def register_model(model_name, dataset_name, model_func):
+  """Register a new model that can be obtained with `get_model_config`."""
+  model_map = _get_model_map(dataset_name)
+  if model_name in model_map:
+    raise ValueError('Model "%s" is already registered for dataset "%s"' %
+                     (model_name, dataset_name))
+  model_map[model_name] = model_func
