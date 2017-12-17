@@ -2,12 +2,10 @@
 # -*- coding: UTF-8 -*-
 # File: resnet-multigpu.py
 
-import cv2
-import sys
 import argparse
 import numpy as np
 import os
-import multiprocessing
+from contextlib import contextmanager
 
 import tensorflow as tf
 from tensorflow.contrib.layers import variance_scaling_initializer
@@ -17,6 +15,8 @@ from tensorpack.utils.stats import RatioCounter
 from tensorpack.utils.gpu import get_nr_gpu
 from tensorpack.tfutils.symbolic_functions import *
 from tensorpack.tfutils.summary import *
+from tensorpack.tfutils.collection import freeze_collection
+from tensorpack.tfutils import get_current_tower_context
 
 from tfbench.convnet_builder import ConvNetBuilder
 from tfbench import model_config
@@ -38,8 +38,17 @@ class Model(ModelDesc):
         return tf.train.GradientDescentOptimizer(lr)
 
 
+@contextmanager
+def maybe_freeze_updates(enable):
+    if enable:
+        with freeze_collection([tf.GraphKeys.UPDATE_OPS]):
+            yield
+    else:
+        yield
+
 class TFBenchModel(Model):
     def _build_graph(self, inputs):
+        ctx = get_current_tower_context()
         image, label = inputs
         image = tf.cast(image, tf.float32) * (1.0 / 255)
         image_mean = tf.constant([0.485, 0.456, 0.406], dtype=tf.float32)
@@ -48,19 +57,22 @@ class TFBenchModel(Model):
         if self.data_format == 'NCHW':
             image = tf.transpose(image, [0, 3, 1, 2])
 
-        network = ConvNetBuilder(
-            image, 3, True, True, data_format=self.data_format,
-            dtype=tf.float32, variable_dtype=tf.float32)
-        dataset = lambda: 1
-        dataset.name = 'imagenet'
-        model_conf = model_config.get_model_config('resnet50', dataset)
-        model_conf.set_batch_size(64)
-        model_conf.add_inference(network)
-        logits = network.affine(1000, activation='linear')
+        with maybe_freeze_updates(ctx.index > 0):
+            network = ConvNetBuilder(
+                image, 3, True, True, data_format=self.data_format,
+                dtype=tf.float32, variable_dtype=tf.float32)
+            dataset = lambda: 1
+            dataset.name = 'imagenet'
+            model_conf = model_config.get_model_config('resnet50', dataset)
+            model_conf.set_batch_size(64)
+            model_conf.add_inference(network)
+            logits = network.affine(1000, activation='linear')
 
         loss = tf.nn.sparse_softmax_cross_entropy_with_logits(logits=logits, labels=label)
         loss = tf.reduce_mean(loss, name='xentropy-loss')
         wd_cost = regularize_cost('.*', tf.contrib.layers.l2_regularizer(1e-4))
+        #vars = tf.trainable_variables()
+        #wd_cost = tf.add_n([tf.nn.l2_loss(v) for v in vars]) * 1e-4
         self.cost = tf.add_n([loss, wd_cost], name='cost')
 
 
