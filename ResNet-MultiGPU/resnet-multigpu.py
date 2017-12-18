@@ -10,7 +10,6 @@ from contextlib import contextmanager
 import tensorflow as tf
 from tensorflow.contrib.layers import variance_scaling_initializer
 from tensorpack import *
-from tensorpack.train import HorovodTrainer
 from tensorpack.utils.stats import RatioCounter
 from tensorpack.utils.gpu import get_nr_gpu
 from tensorpack.tfutils.symbolic_functions import *
@@ -154,22 +153,61 @@ if __name__ == '__main__':
     parser.add_argument('--fake-location', help='the place to create fake data',
                         type=str, default='gpu', choices=['cpu', 'gpu', 'python'])
     parser.add_argument('--variable-update', help='variable update strategy',
-                        type=str, choices=['replicated', 'parameter_server', 'horovod'],
+                        type=str,
+                        choices=['replicated', 'parameter_server', 'horovod'],
                         required=True)
+
+    parser.add_argument('--ps-hosts')
+    parser.add_argument('--worker-hosts')
+    parser.add_argument('--job')
     args = parser.parse_args()
 
     if args.gpu:
         os.environ['CUDA_VISIBLE_DEVICES'] = args.gpu
+
+    if args.job:
+        # distributed:
+        cluster_spec = tf.train.ClusterSpec({
+            'ps': args.ps_hosts.split(','),
+            'worker': args.worker_hosts.split(',')
+        })
+        job = args.job.split(':')[0]
+        if job == 'ps':
+            os.environ['CUDA_VISIBLE_DEVICES'] = ''
+        task_index = int(args.job.split(':')[1])
+        server = tf.train.Server(
+            cluster_spec, job_name=job, task_index=task_index,
+            config=get_default_sess_config())
+
     NR_GPU = get_nr_gpu()
+
+    if args.job:
+        trainer = {
+            'replicated': lambda: DistributedTrainerReplicated(NR_GPU, server),
+            'parameter_server': lambda: DistributedTrainerParameterServer(NR_GPU, server),
+        }[args.variable_update]()
+    else:
+        if NR_GPU == 1:
+            trainer = SimpleTrainer()
+        else:
+            trainer = {
+                'replicated': lambda: SyncMultiGPUTrainerReplicated(NR_GPU),
+                'horovod': lambda: HorovodTrainer(),
+                'parameter_server': lambda: SyncMultiGPUTrainerParameterServer(NR_GPU, ps_device='cpu')
+            }[args.variable_update]()
+            # we already handle gpu_prefetch above manually.
 
     M = TFBenchModel if args.model == 'tfbench' else TensorpackModel
     config = TrainConfig(
         model=M(data_format=args.data_format),
-        callbacks=[ ],
+        callbacks=[
+            ModelSaver(checkpoint_dir='./tmpmodel'),
+        ],
         steps_per_epoch=100,
         max_epoch=10,
     )
 
+    # get input
     input_shape = [64, 224, 224, 3]
     label_shape = [64]
     if args.fake_location == 'gpu':
@@ -193,16 +231,7 @@ if __name__ == '__main__':
         #ds = ds.prefetch(30)
         #config.data = TFDatasetInput(ds)
         config.data = QueueInput(dataflow)
-        config.data = StagingInputWrapper(
-            config.data, range(NR_GPU), nr_stage=max(2 * NR_GPU, 5))
+        config.data = StagingInput(
+            config.data, nr_stage=max(2 * NR_GPU, 5))
 
-    if NR_GPU == 1:
-        trainer = SimpleTrainer()
-    else:
-        trainer = {
-            'replicated': lambda: SyncMultiGPUTrainerReplicated(NR_GPU),
-            'horovod': lambda: HorovodTrainer(),
-            'parameter_server': lambda: SyncMultiGPUTrainerParameterServer(NR_GPU, ps_device='cpu')
-        }[args.variable_update]()
-        # we already handle gpu_prefetch above manually.
     launch_train_with_config(config, trainer)
