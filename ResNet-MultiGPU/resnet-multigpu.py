@@ -6,13 +6,12 @@ import argparse
 import numpy as np
 import os
 from contextlib import contextmanager
-
 import tensorflow as tf
-from tensorflow.contrib.layers import variance_scaling_initializer
+
 from tensorpack import *
+from tensorflow.contrib.layers import variance_scaling_initializer
 from tensorpack.utils.stats import RatioCounter
 from tensorpack.utils.gpu import get_nr_gpu
-from tensorpack.tfutils.symbolic_functions import *
 from tensorpack.tfutils.summary import *
 from tensorpack.tfutils.collection import freeze_collection
 from tensorpack.tfutils import get_current_tower_context
@@ -21,7 +20,6 @@ from tfbench.convnet_builder import ConvNetBuilder
 from tfbench import model_config
 
 INPUT_SHAPE = 224
-DEPTH = 50
 
 
 class Model(ModelDesc):
@@ -33,9 +31,32 @@ class Model(ModelDesc):
                 InputDesc(tf.int32, [None], 'label')]
 
     def _get_optimizer(self):
-        lr = get_scalar_var('learning_rate', 0.1, summary=True)
+        lr = tf.get_variable('learning_rate', initializer=0.1, trainable=False)
         return tf.train.GradientDescentOptimizer(lr)
 
+    def _build_graph(self, inputs):
+        ctx = get_current_tower_context()
+        image, label = inputs
+
+        # all-zero tensor hurt performance for some reason.
+        label = tf.random_uniform(
+            [64],
+            minval=0, maxval=1000 - 1,
+            dtype=tf.int32, name='synthetic_labels')
+
+        image = tf.cast(image, tf.float32) * (1.0 / 127.5) - 1.
+        if self.data_format == 'NCHW':
+            image = tf.transpose(image, [0, 3, 1, 2])
+
+        logits = self._get_logits(image)
+
+        loss = tf.nn.sparse_softmax_cross_entropy_with_logits(logits=logits, labels=label)
+        loss = tf.reduce_mean(loss, name='xentropy-loss')
+        if False:
+            self.cost = loss    # disable wd
+        else:
+            wd_cost = regularize_cost('.*', tf.nn.l2_loss) * 1e-4
+            self.cost = tf.add_n([loss, wd_cost], name='cost')
 
 @contextmanager
 def maybe_freeze_updates(enable):
@@ -46,15 +67,8 @@ def maybe_freeze_updates(enable):
         yield
 
 class TFBenchModel(Model):
-    def _build_graph(self, inputs):
+    def _get_logits(self, image):
         ctx = get_current_tower_context()
-        image, label = inputs
-        image = tf.cast(image, tf.float32) * (1.0 / 255)
-        image_mean = tf.constant([0.485, 0.456, 0.406], dtype=tf.float32)
-        image_std = tf.constant([0.229, 0.224, 0.225], dtype=tf.float32)
-        image = (image - image_mean) / image_std
-        if self.data_format == 'NCHW':
-            image = tf.transpose(image, [0, 3, 1, 2])
 
         with maybe_freeze_updates(ctx.index > 0):
             network = ConvNetBuilder(
@@ -65,29 +79,14 @@ class TFBenchModel(Model):
             model_conf = model_config.get_model_config('resnet50', dataset)
             model_conf.set_batch_size(64)
             model_conf.add_inference(network)
-            logits = network.affine(1000, activation='linear')
-
-        loss = tf.nn.sparse_softmax_cross_entropy_with_logits(logits=logits, labels=label)
-        loss = tf.reduce_mean(loss, name='xentropy-loss')
-        wd_cost = regularize_cost('.*', tf.contrib.layers.l2_regularizer(1e-4))
-        #vars = tf.trainable_variables()
-        #wd_cost = tf.add_n([tf.nn.l2_loss(v) for v in vars]) * 1e-4
-        self.cost = tf.add_n([loss, wd_cost], name='cost')
+            return network.affine(1000, activation='linear', stddev=0.001)
 
 
 class TensorpackModel(Model):
     """
     Implement the same model with tensorpack layers.
     """
-    def _build_graph(self, inputs):
-        image, label = inputs
-        image = tf.cast(image, tf.float32) * (1.0 / 255)
-        image_mean = tf.constant([0.485, 0.456, 0.406], dtype=tf.float32)
-        image_std = tf.constant([0.229, 0.224, 0.225], dtype=tf.float32)
-        image = (image - image_mean) / image_std
-        if self.data_format == 'NCHW':
-            image = tf.transpose(image, [0, 3, 1, 2])
-
+    def _get_logits(self, image):
         def shortcut(l, n_in, n_out, stride):
             if n_in != n_out:
                 l = Conv2D('convshortcut', l, n_out, 1, stride=stride)
@@ -116,11 +115,7 @@ class TensorpackModel(Model):
                         l = block_func(l, features, 1, 'default')
                 return l
 
-        cfg = {
-            50: ([3, 4, 6, 3], bottleneck),
-            101: ([3, 4, 23, 3], bottleneck)
-        }
-        defs, block_func = cfg[DEPTH]
+        defs = [3, 4, 6, 3]
 
         with argscope(Conv2D, nl=tf.identity, use_bias=False,
                       W_init=variance_scaling_initializer(mode='FAN_OUT')), \
@@ -128,19 +123,13 @@ class TensorpackModel(Model):
             logits = (LinearWrap(image)
                       .Conv2D('conv0', 64, 7, stride=2, nl=BNReLU)
                       .MaxPooling('pool0', shape=3, stride=2, padding='SAME')
-                      .apply(layer, 'group0', block_func, 64, defs[0], 1, first=True)
-                      .apply(layer, 'group1', block_func, 128, defs[1], 2)
-                      .apply(layer, 'group2', block_func, 256, defs[2], 2)
-                      .apply(layer, 'group3', block_func, 512, defs[3], 2)
+                      .apply(layer, 'group0', bottleneck, 64, defs[0], 1, first=True)
+                      .apply(layer, 'group1', bottleneck, 128, defs[1], 2)
+                      .apply(layer, 'group2', bottleneck, 256, defs[2], 2)
+                      .apply(layer, 'group3', bottleneck, 512, defs[3], 2)
                       .GlobalAvgPooling('gap')
                       .FullyConnected('linear', 1000, nl=tf.identity)())
-
-        loss = tf.nn.sparse_softmax_cross_entropy_with_logits(logits=logits, labels=label)
-        loss = tf.reduce_mean(loss, name='xentropy-loss')
-
-        wd_cost = regularize_cost('.*/W', l2_regularizer(1e-4), name='l2_regularize_loss')
-        add_moving_summary(loss, wd_cost)
-        self.cost = tf.add_n([loss, wd_cost], name='cost')
+        return logits
 
 
 if __name__ == '__main__':
@@ -195,13 +184,18 @@ if __name__ == '__main__':
                 'horovod': lambda: HorovodTrainer(),
                 'parameter_server': lambda: SyncMultiGPUTrainerParameterServer(NR_GPU, ps_device='cpu')
             }[args.variable_update]()
-            # we already handle gpu_prefetch above manually.
 
     M = TFBenchModel if args.model == 'tfbench' else TensorpackModel
     config = TrainConfig(
         model=M(data_format=args.data_format),
         callbacks=[
-            ModelSaver(checkpoint_dir='./tmpmodel'),
+            # ModelSaver(checkpoint_dir='./tmpmodel'),
+        ],
+        extra_callbacks=[
+            # MovingAverageSummary(),
+            ProgressBar(),
+            MergeAllSummaries(),
+            RunUpdateOps()
         ],
         steps_per_epoch=100,
         max_epoch=10,
@@ -226,12 +220,16 @@ if __name__ == '__main__':
         config.data = TensorInput(fn)
     else:
         dataflow = FakeData([input_shape, label_shape], 1000, random=False, dtype='float32')
-        # our training is quite fast, so we stage more data than default
+        # try the speed of dataset as well.
         #ds = TFDatasetInput.dataflow_to_dataset(dataflow, [tf.float32, tf.int32])
         #ds = ds.prefetch(30)
         #config.data = TFDatasetInput(ds)
         config.data = QueueInput(dataflow)
+
+        # our training is quite fast, so we stage more data than default
         config.data = StagingInput(
             config.data, nr_stage=max(2 * NR_GPU, 5))
 
+    # consistent with tensorflow/benchmarks
+    trainer.COLOCATE_GRADIENTS_WITH_OPS = False
     launch_train_with_config(config, trainer)
