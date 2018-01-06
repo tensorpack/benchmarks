@@ -2,6 +2,7 @@
 # -*- coding: UTF-8 -*-
 # File: resnet-multigpu.py
 
+import sys
 import argparse
 import numpy as np
 import os
@@ -20,6 +21,8 @@ from tfbench.convnet_builder import ConvNetBuilder
 from tfbench import model_config
 
 INPUT_SHAPE = 224
+IMAGE_DTYPE = tf.float32
+IMAGE_DTYPE_NUMPY = 'float32'
 
 
 class Model(ModelDesc):
@@ -27,7 +30,7 @@ class Model(ModelDesc):
         self.data_format = data_format
 
     def _get_inputs(self):
-        return [InputDesc(tf.float32, [None, INPUT_SHAPE, INPUT_SHAPE, 3], 'input'),
+        return [InputDesc(IMAGE_DTYPE, [None, INPUT_SHAPE, INPUT_SHAPE, 3], 'input'),
                 InputDesc(tf.int32, [None], 'label')]
 
     def _get_optimizer(self):
@@ -44,7 +47,8 @@ class Model(ModelDesc):
             minval=0, maxval=1000 - 1,
             dtype=tf.int32, name='synthetic_labels')
 
-        image = tf.cast(image, tf.float32) * (1.0 / 127.5) - 1.
+        # our fake images are in [0, 1]
+        image = tf.cast(image, tf.float32) * 2.0 - 1.
         if self.data_format == 'NCHW':
             image = tf.transpose(image, [0, 3, 1, 2])
 
@@ -132,6 +136,44 @@ class TensorpackModel(Model):
         return logits
 
 
+def get_data(mode):
+    # get input
+    input_shape = [64, 224, 224, 3]
+    label_shape = [64]
+    dataflow = FakeData(
+        [input_shape, label_shape], 1000,
+        random=False, dtype=[IMAGE_DTYPE_NUMPY, 'int32'])
+    if mode == 'gpu':
+        return DummyConstantInput([input_shape, label_shape])
+    elif mode == 'cpu':
+        def fn():
+            # these copied from tensorflow/benchmarks
+            with tf.device('/cpu:0'):
+                images = tf.truncated_normal(
+                    input_shape, dtype=IMAGE_DTYPE, stddev=1e-1, name='synthetic_images')
+                labels = tf.random_uniform(
+                    label_shape, minval=1, maxval=1000, dtype=tf.int32, name='synthetic_labels')
+                # images = tf.contrib.framework.local_variable(images, name='images')
+            return [images, labels]
+        ret = TensorInput(fn)
+        return StagingInput(ret, nr_stage=1)
+    elif mode == 'python':
+        # try the speed of dataset as well.
+        # ds = TFDatasetInput.dataflow_to_dataset(dataflow, [IMAGE_DTYPE, tf.int32])
+        # ds = ds.prefetch(30)
+        # ret = TFDatasetInput(ds)
+        ret = QueueInput(
+            dataflow,
+            queue=tf.FIFOQueue(100, [tf.uint8, tf.int32]))
+        return StagingInput(ret, nr_stage=1)
+    elif mode == 'zmq-serve':
+        send_dataflow_zmq(dataflow, 'ipc://testpipe', hwm=100, format='zmq_op')
+        sys.exit()
+    elif mode == 'zmq-consume':
+        ret = ZMQInput(
+            'ipc://testpipe', hwm=100)
+        return StagingInput(ret, nr_stage=1)
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--gpu', help='comma separated list of GPU(s) to use.')
@@ -140,7 +182,7 @@ if __name__ == '__main__':
     parser.add_argument('--data_format', help='specify NCHW or NHWC',
                         type=str, default='NCHW')
     parser.add_argument('--fake-location', help='the place to create fake data',
-                        type=str, default='gpu', choices=['cpu', 'gpu', 'python'])
+                        type=str, default='gpu', choices=['cpu', 'gpu', 'python', 'zmq-serve', 'zmq-consume'])
     parser.add_argument('--variable-update', help='variable update strategy',
                         type=str,
                         choices=['replicated', 'parameter_server', 'horovod'],
@@ -154,6 +196,8 @@ if __name__ == '__main__':
     if args.gpu:
         os.environ['CUDA_VISIBLE_DEVICES'] = args.gpu
 
+    sessconf = get_default_sess_config()
+    sessconf.inter_op_parallelism_threads = 80 - 16
     if args.job:
         # distributed:
         cluster_spec = tf.train.ClusterSpec({
@@ -166,7 +210,7 @@ if __name__ == '__main__':
         task_index = int(args.job.split(':')[1])
         server = tf.train.Server(
             cluster_spec, job_name=job, task_index=task_index,
-            config=get_default_sess_config())
+            config=sessconf)
 
     NR_GPU = get_nr_gpu()
 
@@ -187,8 +231,10 @@ if __name__ == '__main__':
 
     M = TFBenchModel if args.model == 'tfbench' else TensorpackModel
     config = TrainConfig(
+        data=get_data(args.fake_location),
         model=M(data_format=args.data_format),
         callbacks=[
+            GPUUtilizationTracker(),
             # ModelSaver(checkpoint_dir='./tmpmodel'),
         ],
         extra_callbacks=[
@@ -197,38 +243,11 @@ if __name__ == '__main__':
             MergeAllSummaries(),
             RunUpdateOps()
         ],
+        session_config=sessconf,
         steps_per_epoch=100,
         max_epoch=10,
     )
 
-    # get input
-    input_shape = [64, 224, 224, 3]
-    label_shape = [64]
-    if args.fake_location == 'gpu':
-        config.data = DummyConstantInput([input_shape, label_shape])
-    elif args.fake_location == 'cpu':
-        def fn():
-            # these copied from tensorflow/benchmarks
-            with tf.device('/cpu:0'):
-                images = tf.truncated_normal(
-                    input_shape, dtype=tf.float32, stddev=1e-1, name='synthetic_images')
-                labels = tf.random_uniform(
-                    label_shape, minval=1, maxval=1000, dtype=tf.int32, name='synthetic_labels')
-                images = tf.contrib.framework.local_variable(images, name='images')
-                labels = tf.contrib.framework.local_variable(labels, name='labels')
-                return [images, labels]
-        config.data = TensorInput(fn)
-    else:
-        dataflow = FakeData([input_shape, label_shape], 1000, random=False, dtype='float32')
-        # try the speed of dataset as well.
-        #ds = TFDatasetInput.dataflow_to_dataset(dataflow, [tf.float32, tf.int32])
-        #ds = ds.prefetch(30)
-        #config.data = TFDatasetInput(ds)
-        config.data = QueueInput(dataflow)
-
-        # our training is quite fast, so we stage more data than default
-        config.data = StagingInput(
-            config.data, nr_stage=max(2 * NR_GPU, 5))
 
     # consistent with tensorflow/benchmarks
     trainer.COLOCATE_GRADIENTS_WITH_OPS = False
