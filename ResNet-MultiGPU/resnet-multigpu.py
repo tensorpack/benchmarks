@@ -21,8 +21,8 @@ from tfbench.convnet_builder import ConvNetBuilder
 from tfbench import model_config
 
 INPUT_SHAPE = 224
-IMAGE_DTYPE = tf.float32
-IMAGE_DTYPE_NUMPY = 'float32'
+IMAGE_DTYPE = tf.uint8
+IMAGE_DTYPE_NUMPY = 'uint8'
 
 
 class Model(ModelDesc):
@@ -157,21 +157,22 @@ def get_data(mode):
             return [images, labels]
         ret = TensorInput(fn)
         return StagingInput(ret, nr_stage=1)
-    elif mode == 'python':
-        # try the speed of dataset as well.
-        # ds = TFDatasetInput.dataflow_to_dataset(dataflow, [IMAGE_DTYPE, tf.int32])
-        # ds = ds.prefetch(30)
-        # ret = TFDatasetInput(ds)
+    elif mode == 'python' or mode == 'python-queue':
         ret = QueueInput(
             dataflow,
-            queue=tf.FIFOQueue(100, [tf.uint8, tf.int32]))
+            queue=tf.FIFOQueue(args.prefetch, [IMAGE_DTYPE, tf.int32]))
+        return StagingInput(ret, nr_stage=1)
+    elif mode == 'python-dataset':
+        ds = TFDatasetInput.dataflow_to_dataset(dataflow, [IMAGE_DTYPE, tf.int32])
+        ds = ds.prefetch(args.prefetch)
+        ret = TFDatasetInput(ds)
         return StagingInput(ret, nr_stage=1)
     elif mode == 'zmq-serve':
-        send_dataflow_zmq(dataflow, 'ipc://testpipe', hwm=100, format='zmq_op')
+        send_dataflow_zmq(dataflow, 'ipc://testpipe', hwm=args.prefetch, format='zmq_op')
         sys.exit()
     elif mode == 'zmq-consume':
         ret = ZMQInput(
-            'ipc://testpipe', hwm=100)
+            'ipc://testpipe', hwm=args.prefetch)
         return StagingInput(ret, nr_stage=1)
 
 if __name__ == '__main__':
@@ -179,10 +180,15 @@ if __name__ == '__main__':
     parser.add_argument('--gpu', help='comma separated list of GPU(s) to use.')
     parser.add_argument('--model', choices=['tfbench', 'tensorpack'], default='tfbench')
     parser.add_argument('--load', help='load model')
+    parser.add_argument('--prefetch', type=int, default=150)
     parser.add_argument('--data_format', help='specify NCHW or NHWC',
                         type=str, default='NCHW')
     parser.add_argument('--fake-location', help='the place to create fake data',
-                        type=str, default='gpu', choices=['cpu', 'gpu', 'python', 'zmq-serve', 'zmq-consume'])
+                        type=str, default='gpu',
+                        choices=[
+                            'cpu', 'gpu',
+                            'python', 'python-queue', 'python-dataset',
+                            'zmq-serve', 'zmq-consume'])
     parser.add_argument('--variable-update', help='variable update strategy',
                         type=str,
                         choices=['replicated', 'parameter_server', 'horovod'],
