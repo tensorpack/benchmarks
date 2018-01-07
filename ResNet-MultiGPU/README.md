@@ -14,7 +14,7 @@ python tf_cnn_benchmarks.py --num_gpus=8 --batch_size=64 --model=resnet50 --vari
 
 is roughly the same as this tensorpack script:
 ```
-python resnet-multigpu.py --fake-location [options] --variable-update=replicated/parameter_server
+python resnet-multigpu.py --fake-location gpu --variable-update=replicated/parameter_server
 ```
 
 There are tiny differences in the way data is synthesized (the `--fake-location` option):
@@ -35,9 +35,7 @@ It's also faster than `tensorflow/benchmarks` (tested on Jan 6 2018 with TF1.5.0
 ## Performance (image/second):
 
 The following was tested with: TF v1.3.0-rc1-1302-g593dc8e on a single DGX1.
-
-Note that these experiements are run on machines of the same configurations,
-but not the same set of physical machines. So expect some variance in results.
+Experiments were not run for multiple times. So expect some variance in results.
 
 variable-update=replicated:
 
