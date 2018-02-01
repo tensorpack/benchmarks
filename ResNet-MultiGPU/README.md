@@ -1,9 +1,12 @@
 
 # Benchmark MultiGPU training against tensorflow/benchmarks
 
-tensorpack MultiGPU trainers are implemented following the awesome examples in
+Tensorpack MultiGPU trainers are implemented following the awesome examples in
 [tensorflow/benchmarks](https://github.com/tensorflow/benchmarks).
 Their performance should be the same.
+
+This script is focused on the performance of different parallel strategies.
+To train on real data with reasonable experiments settings, see [ResNet-Horovod](../ResNet-Horovod).
 
 ## Scripts:
 
