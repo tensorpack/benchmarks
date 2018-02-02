@@ -16,9 +16,7 @@ import horovod.tensorflow as hvd
 from imagenet_utils import (
     fbresnet_augmentor, ImageNetModel, eval_on_ILSVRC12)
 from resnet_model import (
-    preresnet_group, preresnet_basicblock, preresnet_bottleneck,
-    resnet_group, resnet_basicblock, resnet_bottleneck, se_resnet_bottleneck,
-    resnet_backbone)
+    resnet_group, resnet_bottleneck, resnet_backbone)
 
 
 """
@@ -61,30 +59,20 @@ Note:
 
 
 class Model(ImageNetModel):
-    def __init__(self, depth, data_format='NCHW', mode='resnet'):
+    def __init__(self, depth, data_format='NCHW'):
         super(Model, self).__init__(data_format)
-
-        if mode == 'se':
-            assert depth >= 50
-
-        self.mode = mode
-        basicblock = preresnet_basicblock if mode == 'preact' else resnet_basicblock
-        bottleneck = {
-            'resnet': resnet_bottleneck,
-            'preact': preresnet_bottleneck,
-            'se': se_resnet_bottleneck}[mode]
+        bottleneck = resnet_bottleneck
         self.num_blocks, self.block_func = {
-            18: ([2, 2, 2, 2], basicblock),
-            34: ([3, 4, 6, 3], basicblock),
-            50: ([3, 4, 6, 3], bottleneck), 101: ([3, 4, 23, 3], bottleneck),
+            50: ([3, 4, 6, 3], bottleneck),
+            101: ([3, 4, 23, 3], bottleneck),
             152: ([3, 8, 36, 3], bottleneck)
         }[depth]
 
     def get_logits(self, image):
         with argscope([Conv2D, MaxPooling, GlobalAvgPooling, BatchNorm], data_format=self.data_format):
-            return resnet_backbone(
-                image, self.num_blocks,
-                preresnet_group if self.mode == 'preact' else resnet_group, self.block_func)
+            return resnet_backbone(image, self.num_blocks, resnet_group, self.block_func)
+
+    # TODO Sec 3: momentum correction, loss scaling
 
 
 def get_val_data(batch):
@@ -120,37 +108,47 @@ def get_config(model, fake=False):
         data = ZMQInput('ipc://@imagenet-train-b{}'.format(batch), 30, bind=False)
         data = StagingInput(data)
 
+        """
+        Sec 2.1: Linear Scaling Rule: When the minibatch size is multiplied by k, multiply the learning rate by k.
+        """
         BASE_LR = 0.1 * (total_batch // 256)
         logger.info("Base LR: {}".format(BASE_LR))
         callbacks = [
             ModelSaver(),
             ScheduledHyperParamSetter(
                 'learning_rate', [(30, BASE_LR * 1e-1), (60, BASE_LR * 1e-2),
-                                  (85, BASE_LR * 1e-3), (95, BASE_LR * 1e-4),
-                                  (105, BASE_LR * 1e-5)]),
+                                  (80, BASE_LR * 1e-3)]),
         ]
         if BASE_LR != 0.1:
+            """
+            Sec 2.2: In practice, with a large minibatch of size kn, we start from a learning rate of η and increment
+            it by a constant amount at each iteration such that it reachesη = kη after 5 epochs. After the warmup phase, we go back
+            to the original learning rate schedule.
+            """
+            # TODO change every step?
             callbacks.append(
                 ScheduledHyperParamSetter(
-                    'learning_rate', [(0, 0.1), (3, BASE_LR)],
+                    'learning_rate', [(0, 0.1), (5, BASE_LR)],
                     interp='linear'))
 
-        # For distributed training, you probably don't want everyone to wait for validation.
+        # TODO For distributed training, you probably don't want everyone to wait for validation.
         # Better to start a separate job, since the model is saved.
         if hvd.rank() == 0:
             # for reproducibility, do not use remote data for validation
             dataset_val = get_val_data(batch)
+            #dataset_val = FakeData(
+                #[[128, 224, 224, 3], [128]], 1000, random=False, dtype='uint8')
             infs = [ClassificationError('wrong-top1', 'val-error-top1'),
                     ClassificationError('wrong-top5', 'val-error-top5')]
-            # now it fails: https://github.com/uber/horovod/issues/159
-            #callbacks.append(InferenceRunner(QueueInput(dataset_val), infs))
+            # Now it fails: https://github.com/uber/horovod/issues/159
+            callbacks.append(InferenceRunner(QueueInput(dataset_val), infs))
 
     return TrainConfig(
         model=model,
         data=data,
         callbacks=callbacks,
-        steps_per_epoch=100 if args.fake else 1280000 // total_batch,
-        max_epoch=110,
+        steps_per_epoch=100 if args.fake else 800, #1280000 // total_batch,
+        max_epoch=90,
     )
 
 
@@ -163,17 +161,18 @@ if __name__ == '__main__':
     parser.add_argument('--data_format', help='specify NCHW or NHWC',
                         type=str, default='NCHW')
     parser.add_argument('-d', '--depth', help='resnet depth',
-                        type=int, default=18, choices=[18, 34, 50, 101, 152])
+                        type=int, default=50, choices=[50, 101, 152])
     parser.add_argument('--eval', action='store_true')
+    """
+    Sec 2.3: We keep the per-worker sample size n constant when we change the number of workers k.
+    """
     parser.add_argument('--batch', help='per-GPU batch size', default=64, type=int)
-    parser.add_argument('--mode', choices=['resnet', 'preact', 'se'],
-                        help='variants of resnet to use', default='resnet')
     args = parser.parse_args()
 
     if args.gpu:
         os.environ['CUDA_VISIBLE_DEVICES'] = args.gpu
 
-    model = Model(args.depth, args.data_format, args.mode)
+    model = Model(args.depth, args.data_format)
     if args.eval:
         batch = 128    # something that can run on one gpu
         ds = get_val_data(batch)
@@ -187,7 +186,7 @@ if __name__ == '__main__':
                 logger.set_logger_dir(
                     os.path.join(
                         'train_log',
-                        'imagenet-{}-d{}'.format(args.mode, args.depth)), 'd')
+                        'imagenet-resnet-d{}'.format(args.depth)), 'd')
 
         config = get_config(model, fake=args.fake)
         if args.load:
