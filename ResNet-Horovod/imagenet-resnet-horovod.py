@@ -136,18 +136,15 @@ def get_config(model, fake=False):
         if hvd.rank() == 0:
             # for reproducibility, do not use remote data for validation
             dataset_val = get_val_data(batch)
-            #dataset_val = FakeData(
-                #[[128, 224, 224, 3], [128]], 1000, random=False, dtype='uint8')
             infs = [ClassificationError('wrong-top1', 'val-error-top1'),
                     ClassificationError('wrong-top5', 'val-error-top5')]
-            # Now it fails: https://github.com/uber/horovod/issues/159
             callbacks.append(InferenceRunner(QueueInput(dataset_val), infs))
 
     return TrainConfig(
         model=model,
         data=data,
         callbacks=callbacks,
-        steps_per_epoch=100 if args.fake else 800, #1280000 // total_batch,
+        steps_per_epoch=100 if args.fake else 1280000 // total_batch,
         max_epoch=90,
     )
 
