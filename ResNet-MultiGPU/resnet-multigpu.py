@@ -30,8 +30,8 @@ class Model(ModelDesc):
         self.data_format = data_format
 
     def _get_inputs(self):
-        return [InputDesc(IMAGE_DTYPE, [None, INPUT_SHAPE, INPUT_SHAPE, 3], 'input'),
-                InputDesc(tf.int32, [None], 'label')]
+        return [InputDesc(IMAGE_DTYPE, [args.batch, INPUT_SHAPE, INPUT_SHAPE, 3], 'input'),
+                InputDesc(tf.int32, [args.batch], 'label')]
 
     def _get_optimizer(self):
         lr = tf.get_variable('learning_rate', initializer=0.1, trainable=False)
@@ -43,7 +43,7 @@ class Model(ModelDesc):
 
         # all-zero tensor hurt performance for some reason.
         label = tf.random_uniform(
-            [64],
+            [args.batch],
             minval=0, maxval=1000 - 1,
             dtype=tf.int32, name='synthetic_labels')
 
@@ -81,7 +81,7 @@ class TFBenchModel(Model):
             dataset = lambda: 1
             dataset.name = 'imagenet'
             model_conf = model_config.get_model_config('resnet50', dataset)
-            model_conf.set_batch_size(64)
+            model_conf.set_batch_size(args.batch)
             model_conf.add_inference(network)
             return network.affine(1000, activation='linear', stddev=0.001)
 
@@ -138,8 +138,8 @@ class TensorpackModel(Model):
 
 def get_data(mode):
     # get input
-    input_shape = [64, 224, 224, 3]
-    label_shape = [64]
+    input_shape = [args.batch, 224, 224, 3]
+    label_shape = [args.batch]
     dataflow = FakeData(
         [input_shape, label_shape], 1000,
         random=False, dtype=[IMAGE_DTYPE_NUMPY, 'int32'])
@@ -181,6 +181,7 @@ if __name__ == '__main__':
     parser.add_argument('--model', choices=['tfbench', 'tensorpack'], default='tfbench')
     parser.add_argument('--load', help='load model')
     parser.add_argument('--prefetch', type=int, default=150)
+    parser.add_argument('--batch', type=int, default=64)
     parser.add_argument('--data_format', help='specify NCHW or NHWC',
                         type=str, default='NCHW')
     parser.add_argument('--fake-location', help='the place to create fake data',
@@ -230,7 +231,9 @@ if __name__ == '__main__':
             trainer = SimpleTrainer()
         else:
             trainer = {
-                'replicated': lambda: SyncMultiGPUTrainerReplicated(NR_GPU),
+                'replicated': lambda: SyncMultiGPUTrainerReplicated(
+                    NR_GPU, average=False, use_nccl=False),
+                    # this is the actual configuration used by tfbench
                 'horovod': lambda: HorovodTrainer(),
                 'parameter_server': lambda: SyncMultiGPUTrainerParameterServer(NR_GPU, ps_device='cpu')
             }[args.variable_update]()
@@ -250,7 +253,7 @@ if __name__ == '__main__':
             RunUpdateOps()
         ],
         session_config=sessconf,
-        steps_per_epoch=100,
+        steps_per_epoch=50,
         max_epoch=10,
     )
 
