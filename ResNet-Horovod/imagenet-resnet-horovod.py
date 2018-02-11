@@ -4,6 +4,8 @@
 
 import argparse
 import os
+import socket
+import numpy as np
 import multiprocessing as mp
 import cv2
 
@@ -59,20 +61,29 @@ Note:
 
 
 class Model(ImageNetModel):
-    def __init__(self, depth, data_format='NCHW'):
-        super(Model, self).__init__(data_format)
-        bottleneck = resnet_bottleneck
+    def __init__(self, depth, loss_scale=1.0):
+        super(Model, self).__init__('NCHW')
+        self._loss_scale = loss_scale
         self.num_blocks, self.block_func = {
-            50: ([3, 4, 6, 3], bottleneck),
-            101: ([3, 4, 23, 3], bottleneck),
-            152: ([3, 8, 36, 3], bottleneck)
+            50: ([3, 4, 6, 3], resnet_bottleneck),
+            101: ([3, 4, 23, 3], resnet_bottleneck),
+            152: ([3, 8, 36, 3], resnet_bottleneck)
         }[depth]
 
     def get_logits(self, image):
-        with argscope([Conv2D, MaxPooling, GlobalAvgPooling, BatchNorm], data_format=self.data_format):
+        with argscope([Conv2D, MaxPooling, GlobalAvgPooling, BatchNorm], data_format='NCHW'):
             return resnet_backbone(image, self.num_blocks, resnet_group, self.block_func)
 
-    # TODO Sec 3: momentum correction, loss scaling
+    def _build_graph(self, inputs):
+        """
+        Sec 3: Remark 3: Normalize the per-worker loss by
+        total minibatch size kn, not per-worker size n.
+        """
+        super(Model, self)._build_graph(inputs)
+        if self._loss_scale != 1.0:
+            self.cost = self.cost * self._loss_scale
+
+    # TODO Sec 3: momentum correction
 
 
 def get_val_data(batch):
@@ -100,13 +111,18 @@ def get_config(model, fake=False):
     if fake:
         logger.info("For benchmark, batch size is fixed to 64 per tower.")
         data = FakeData(
-            [[64, 224, 224, 3], [64]], 1000, random=False, dtype='uint8')
+            [[64, 224, 224, 3], [64]], 1000,
+            random=False, dtype=['uint8', 'int32'])
         data = StagingInput(QueueInput(data))
         callbacks = []
+        steps_per_epoch = 100
     else:
         logger.info("#Tower: {}; Batch size per tower: {}".format(hvd.size(), batch))
         data = ZMQInput('ipc://@imagenet-train-b{}'.format(batch), 30, bind=False)
-        data = StagingInput(data)
+        #data = StagingInput(data, nr_stage=2, device='/cpu:0')
+        data = StagingInput(data, nr_stage=1)
+
+        steps_per_epoch = int(np.round(1281167 / total_batch))
 
         """
         Sec 2.1: Linear Scaling Rule: When the minibatch size is multiplied by k, multiply the learning rate by k.
@@ -125,16 +141,17 @@ def get_config(model, fake=False):
             it by a constant amount at each iteration such that it reachesη = kη after 5 epochs. After the warmup phase, we go back
             to the original learning rate schedule.
             """
-            # TODO change every step?
             callbacks.append(
                 ScheduledHyperParamSetter(
-                    'learning_rate', [(0, 0.1), (5, BASE_LR)],
-                    interp='linear'))
+                    'learning_rate', [(0, 0.1), (5 * steps_per_epoch, BASE_LR)],
+                    interp='linear', step_based=True))
 
-        # TODO For distributed training, you probably don't want everyone to wait for validation.
-        # Better to start a separate job, since the model is saved.
         if hvd.rank() == 0:
-            # for reproducibility, do not use remote data for validation
+            #callbacks.append(GPUUtilizationTracker())
+
+            # TODO For distributed training, you probably don't want everyone to wait for validation.
+            # Better to start a separate job, since the model is saved.
+            # For reproducibility, do not use remote data for validation
             dataset_val = get_val_data(batch)
             infs = [ClassificationError('wrong-top1', 'val-error-top1'),
                     ClassificationError('wrong-top5', 'val-error-top5')]
@@ -144,7 +161,7 @@ def get_config(model, fake=False):
         model=model,
         data=data,
         callbacks=callbacks,
-        steps_per_epoch=100 if args.fake else 1280000 // total_batch,
+        steps_per_epoch=steps_per_epoch,
         max_epoch=90,
     )
 
@@ -169,10 +186,12 @@ if __name__ == '__main__':
     if args.gpu:
         os.environ['CUDA_VISIBLE_DEVICES'] = args.gpu
 
-    model = Model(args.depth, args.data_format)
+    logger.info("Running on {}".format(socket.gethostname()))
+
     if args.eval:
         batch = 128    # something that can run on one gpu
         ds = get_val_data(batch)
+        model = Model(args.depth)
         eval_on_ILSVRC12(model, get_model_loader(args.load), ds)
     else:
         hvd.init()
@@ -185,8 +204,9 @@ if __name__ == '__main__':
                         'train_log',
                         'imagenet-resnet-d{}'.format(args.depth)), 'd')
 
+        model = Model(args.depth, loss_scale=1.0 / hvd.size())
         config = get_config(model, fake=args.fake)
         if args.load:
             config.session_init = get_model_loader(args.load)
-        trainer = HorovodTrainer()
+        trainer = HorovodTrainer(average=False)
         launch_train_with_config(config, trainer)

@@ -5,8 +5,10 @@
 import argparse
 import os
 import multiprocessing as mp
+import socket
 
-from tensorpack.dataflow import send_dataflow_zmq, MapData, TestDataSpeed
+from tensorpack.dataflow import send_dataflow_zmq, MapData, TestDataSpeed, FakeData
+from tensorpack.utils import logger
 from imagenet_utils import (
     fbresnet_augmentor, get_imagenet_dataflow)
 
@@ -23,6 +25,7 @@ def get_data(name, batch):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--data', help='ILSVRC dataset dir')
+    parser.add_argument('--fake', action='store_true')
     parser.add_argument('--batch', help='per-GPU batch size',
                         default=64, type=int)
     parser.add_argument('--benchmark', action='store_true')
@@ -30,7 +33,14 @@ if __name__ == '__main__':
 
     os.environ['CUDA_VISIBLE_DEVICES'] = ''
 
-    ds = get_data('train', args.batch)
+    if args.fake:
+        ds = FakeData(
+            [[args.batch, 224, 224, 3], [args.batch]],
+            1000, random=False, dtype=['uint8', 'int32'])
+    else:
+        ds = get_data('train', args.batch)
+
+    logger.info("Running on {}".format(socket.gethostname()))
 
     if args.benchmark:
         ds = MapData(ds, dump_arrays)
