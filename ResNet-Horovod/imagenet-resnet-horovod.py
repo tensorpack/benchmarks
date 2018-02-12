@@ -111,7 +111,7 @@ def get_config(model, fake=False):
     if fake:
         logger.info("For benchmark, batch size is fixed to 64 per tower.")
         data = FakeData(
-            [[64, 224, 224, 3], [64]], 1000,
+            [[args.batch, 224, 224, 3], [args.batch]], 1000,
             random=False, dtype=['uint8', 'int32'])
         data = StagingInput(QueueInput(data))
         callbacks = []
@@ -129,6 +129,11 @@ def get_config(model, fake=False):
         """
         BASE_LR = 0.1 * (total_batch // 256)
         logger.info("Base LR: {}".format(BASE_LR))
+        """
+        Sec 5.1:
+        We call this number (0.1 * kn / 256 ) the reference learning rate,
+        and reduce it by 1/10 at the 30-th, 60-th, and 80-th epoch
+        """
         callbacks = [
             ModelSaver(),
             ScheduledHyperParamSetter(
@@ -162,7 +167,7 @@ def get_config(model, fake=False):
         data=data,
         callbacks=callbacks,
         steps_per_epoch=steps_per_epoch,
-        max_epoch=90,
+        max_epoch=25 if args.fake else 90,
     )
 
 
@@ -170,6 +175,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--gpu', help='comma separated list of GPU(s) to use.')
     parser.add_argument('--data', help='ILSVRC dataset dir')
+    parser.add_argument('--logdir', default='train_log/tmp')
     parser.add_argument('--load', help='load model')
     parser.add_argument('--fake', help='use fakedata to test or benchmark this model', action='store_true')
     parser.add_argument('--data_format', help='specify NCHW or NHWC',
@@ -179,8 +185,9 @@ if __name__ == '__main__':
     parser.add_argument('--eval', action='store_true')
     """
     Sec 2.3: We keep the per-worker sample size n constant when we change the number of workers k.
+    In this work, we use n = 32 which has performed well for a wide range of datasets and networks.
     """
-    parser.add_argument('--batch', help='per-GPU batch size', default=64, type=int)
+    parser.add_argument('--batch', help='per-GPU batch size', default=32, type=int)
     args = parser.parse_args()
 
     if args.gpu:
@@ -196,17 +203,15 @@ if __name__ == '__main__':
     else:
         hvd.init()
         if hvd.rank() == 0:
-            if args.fake:
-                logger.set_logger_dir(os.path.join('train_log', 'tmp'), 'd')
-            else:
-                logger.set_logger_dir(
-                    os.path.join(
-                        'train_log',
-                        'imagenet-resnet-d{}'.format(args.depth)), 'd')
+            logger.set_logger_dir(args.logdir, 'd')
 
         model = Model(args.depth, loss_scale=1.0 / hvd.size())
         config = get_config(model, fake=args.fake)
         if args.load:
             config.session_init = get_model_loader(args.load)
+        """
+        Sec 3: standard communication primitives like
+        allreduce [11] perform summing, not averaging
+        """
         trainer = HorovodTrainer(average=False)
         launch_train_with_config(config, trainer)

@@ -27,7 +27,7 @@ if __name__ == '__main__':
     parser.add_argument('--data', help='ILSVRC dataset dir')
     parser.add_argument('--fake', action='store_true')
     parser.add_argument('--batch', help='per-GPU batch size',
-                        default=64, type=int)
+                        default=32, type=int)
     parser.add_argument('--benchmark', action='store_true')
     args = parser.parse_args()
 

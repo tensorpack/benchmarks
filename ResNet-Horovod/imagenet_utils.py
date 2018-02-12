@@ -55,22 +55,28 @@ def fbresnet_augmentor(isTrain):
     Augmentor used in fb.resnet.torch, for BGR images in range [0,255].
     """
     if isTrain:
+        """
+        Sec 5.1:
+        We use scale and aspect ratio data augmentation [35] as
+        in [12]. The network input image is a 224×224 pixel random
+        crop from an augmented image or its horizontal flip.
+        """
         augmentors = [
             GoogleNetResize(),
-            imgaug.RandomOrderAug(
-                [imgaug.BrightnessScale((0.6, 1.4), clip=False),
-                 imgaug.Contrast((0.6, 1.4), clip=False),
-                 imgaug.Saturation(0.4, rgb=False),
-                 # rgb-bgr conversion for the constants copied from fb.resnet.torch
-                 imgaug.Lighting(0.1,
-                                 eigval=np.asarray(
-                                     [0.2175, 0.0188, 0.0045][::-1]) * 255.0,
-                                 eigvec=np.array(
-                                     [[-0.5675, 0.7192, 0.4009],
-                                      [-0.5808, -0.0045, -0.8140],
-                                      [-0.5836, -0.6948, 0.4203]],
-                                     dtype='float32')[::-1, ::-1]
-                                 )]),
+            #  imgaug.RandomOrderAug(
+            #      [imgaug.BrightnessScale((0.6, 1.4), clip=False),
+            #       imgaug.Contrast((0.6, 1.4), clip=False),
+            #       imgaug.Saturation(0.4, rgb=False),
+            #       # rgb-bgr conversion for the constants copied from fb.resnet.torch
+            #       imgaug.Lighting(0.1,
+            #                       eigval=np.asarray(
+            #                           [0.2175, 0.0188, 0.0045][::-1]) * 255.0,
+            #                       eigvec=np.array(
+            #                           [[-0.5675, 0.7192, 0.4009],
+            #                            [-0.5808, -0.0045, -0.8140],
+            #                            [-0.5836, -0.6948, 0.4203]],
+            #                           dtype='float32')[::-1, ::-1]
+            #                       )]),
             imgaug.Flip(horiz=True),
         ]
     else:
@@ -178,6 +184,9 @@ class ImageNetModel(ModelDesc):
         """
 
     def _get_optimizer(self):
+        """
+        Sec 5.1: We use Nesterov momentum with m of 0.9.
+        """
         lr = tf.get_variable('learning_rate', initializer=0.1, trainable=False)
         tf.summary.scalar('learning_rate-summary', lr)
         return tf.train.MomentumOptimizer(lr, 0.9, use_nesterov=True)
@@ -189,6 +198,11 @@ class ImageNetModel(ModelDesc):
                 image = tf.cast(image, tf.float32)
             image = image * (1.0 / 255)
 
+            """
+            Sec 5.1:
+            The input image is normalized by the per-color mean and
+            standard deviation, as in [12]
+            """
             mean = [0.485, 0.456, 0.406]    # rgb
             std = [0.229, 0.224, 0.225]
             if bgr:

@@ -59,7 +59,18 @@ def resnet_bottleneck(l, ch_out, stride, stride_first=False):
     """
     shortcut = l
     l = Conv2D('conv1', l, ch_out, 1, stride=stride if stride_first else 1, nl=BNReLU)
+    """
+    Sec 5.1:
+    We use the ResNet-50 [16] variant from [12], noting that
+    the stride-2 convolutions are on 3×3 layers instead of on 1×1 layers
+    """
     l = Conv2D('conv2', l, ch_out, 3, stride=1 if stride_first else stride, nl=BNReLU)
+    """
+    Section 5.1:
+    For BN layers, the learnable scaling coefficient γ is initialized
+    to be 1, except for each residual block's last BN
+    where γ is initialized to be 0.
+    """
     l = Conv2D('conv3', l, ch_out * 4, 1, nl=get_bn(zero_init=True))
     return l + resnet_shortcut(shortcut, ch_out * 4, stride, nl=get_bn(zero_init=False))
 
@@ -84,5 +95,13 @@ def resnet_backbone(image, num_blocks, group_func, block_func):
                   .apply(group_func, 'group2', block_func, 256, num_blocks[2], 2)
                   .apply(group_func, 'group3', block_func, 512, num_blocks[3], 2)
                   .GlobalAvgPooling('gap')
-                  .FullyConnected('linear', 1000, nl=tf.identity)())
+                  .FullyConnected(
+                      'linear', 1000, nl=tf.identity,
+                      W_init=tf.random_normal_initializer(stddev=0.01))())
+    """
+    Sec 5.1:
+    The 1000-way fully-connected layer is initialized by
+    drawing weights from a zero-mean Gaussian with standard
+    deviation of 0.01.
+    """
     return logits
