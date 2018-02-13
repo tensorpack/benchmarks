@@ -20,15 +20,6 @@ def resnet_shortcut(l, n_out, stride, nl=tf.identity):
         return l
 
 
-def apply_preactivation(l, preact):
-    if preact == 'bnrelu':
-        shortcut = l    # preserve identity mapping
-        l = BNReLU('preact', l)
-    else:
-        shortcut = l
-    return l, shortcut
-
-
 def get_bn(zero_init=False):
     """
     Sec 5.1: For BN layers, the learnable scaling coefficient γ is initialized
@@ -44,13 +35,6 @@ def get_bn(zero_init=False):
         return lambda x, name: BatchNorm('bn', x, gamma_init=tf.zeros_initializer())
     else:
         return lambda x, name: BatchNorm('bn', x)
-
-
-def resnet_basicblock(l, ch_out, stride):
-    shortcut = l
-    l = Conv2D('conv1', l, ch_out, 3, stride=stride, nl=BNReLU)
-    l = Conv2D('conv2', l, ch_out, 3, nl=get_bn(zero_init=True))
-    return l + resnet_shortcut(shortcut, ch_out, stride, nl=get_bn(zero_init=False))
 
 
 def resnet_bottleneck(l, ch_out, stride, stride_first=False):

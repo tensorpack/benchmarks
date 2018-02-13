@@ -116,7 +116,8 @@ def get_imagenet_dataflow(
             return im, cls
         ds = MultiThreadMapData(ds, parallel, mapf, buffer_size=2000, strict=True)
         ds = BatchData(ds, batch_size, remainder=True)
-        ds = PrefetchDataZMQ(ds, 1)
+        # ds = PrefetchDataZMQ(ds, 1)
+        # do not fork() under MPI
     return ds
 
 
@@ -229,22 +230,3 @@ class ImageNetModel(ModelDesc):
         wrong = prediction_incorrect(logits, label, 5, name='wrong-top5')
         add_moving_summary(tf.reduce_mean(wrong, name='train-error-top5'))
         return loss
-
-
-if __name__ == '__main__':
-    import argparse
-    from tensorpack.dataflow import TestDataSpeed
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--data', required=True)
-    parser.add_argument('--batch', type=int, default=32)
-    parser.add_argument('--aug', choices=['train', 'val'], default='val')
-    args = parser.parse_args()
-
-    if args.aug == 'val':
-        augs = fbresnet_augmentor(False)
-    elif args.aug == 'train':
-        augs = fbresnet_augmentor(True)
-    df = get_imagenet_dataflow(
-        args.data, 'train', args.batch, augs)
-    # For val augmentor, Should get >100 it/s (i.e. 3k im/s) here on a decent E5 server.
-    TestDataSpeed(df).start()

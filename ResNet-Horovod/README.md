@@ -8,6 +8,8 @@ It follows most settings in the paper
 
 ## Usage:
 
+Install TF>=1.5, tensorpack>=0.8.1, [Horovod](https://github.com/uber/horovod), [zmq_ops](https://github.com/tensorpack/zmq_ops)
+
 ```bash
 # Single Machine:
 $ ./serve-data.py --data ~/data/imagenet/ --batch 64
