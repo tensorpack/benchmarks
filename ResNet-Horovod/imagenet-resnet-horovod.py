@@ -21,55 +21,6 @@ from resnet_model import (
     resnet_group, resnet_bottleneck, resnet_backbone)
 
 
-"""
-Run on single machine:
-
-    python3 ./serve-data.py --data ~/data/imagenet/ --batch 64
-    mpirun -np 8 --output-filename test.log python3 ./imagenet-resnet-horovod.py -d 50 --data ~/data/imagenet/ --batch 64
-
-Run on multiple machines with RoCE/IB:
-    host1: python3 ./serve-data.py --data ~/data/imagenet/ --batch 64
-    host2: python3 ./serve-data.py --data ~/data/imagenet/ --batch 64
-    mpirun -np 16 -H host1:8,host2:8 --output-filename test.log \
-        -bind-to none -map-by slot \
-        -mca pml ob1 -mca btl_openib_receive_queues P,128,32:P,2048,32:P,12288,32:P,65536,32 \
-        -x PATH -x PYTHONPATH -x LD_LIBRARY_PATH python3 -x NCCL_DEBUG=INFO \
-        ./imagenet-resnet-horovod.py -d 50 --data ~/data/imagenet/ --batch 64
-
-    MPI does not like fork(), so running `serve-data.py` inside MPI is not a
-    good idea. It actually also makes my data slow, which I don't know why.
-    Maybe something specific to my environments.
-
-    Remove some MPI arguments if running with plain TCP.
-    See https://github.com/uber/horovod/blob/master/docs/benchmarks.md for details.
-
-Benchmark data:
-
-    python3 ./serve-data.py --data ~/data/imagenet/ --batch 64 --benchmark
-    # image/s = itr/s * 64
-
-Benchmark training:
-    Train with `--fake`.
-
-Performance on V100s (batch 64):
-    1 machine fake data: 2400 im/s
-    2 machine, fake data: 2381 * 2 im/s
-    2 machine, true data: 2291 * 2 im/s
-
-Performanec on P100s (batch 64):
-    1 machine fake data: 1638 im/s
-    16 machine, fake data: 1489 * 16im/s
-    16 machine, true data: 1464 * 16im/s
-
-Note:
-    For speed measurement, the epoch length of the master process is the right number to look at.
-    Epoch length of workers will be longer because they wait for master to run
-    the unnecessary callbacks (save model, evaluation).
-
-    Sometimes MPI fails to terminate all processes.
-"""
-
-
 class Model(ImageNetModel):
     def __init__(self, depth, loss_scale=1.0):
         super(Model, self).__init__('NCHW')
@@ -108,7 +59,7 @@ def get_val_data(batch):
         im = aug.augment(im)
         return im, cls
 
-    ds = MultiThreadMapData(ds, min(40, mp.cpu_count()), mapf, buffer_size=2000, strict=True)
+    ds = MultiThreadMapData(ds, 3, mapf, buffer_size=2000, strict=True)
     ds = BatchData(ds, batch, remainder=True)
     # do not fork() under MPI
     return ds
@@ -129,7 +80,6 @@ def get_config(model, fake=False):
     else:
         logger.info("#Tower: {}; Batch size per tower: {}".format(hvd.size(), batch))
         data = ZMQInput('ipc://@imagenet-train-b{}'.format(batch), 30, bind=False)
-        #data = StagingInput(data, nr_stage=2, device='/cpu:0')
         data = StagingInput(data, nr_stage=1)
 
         steps_per_epoch = int(np.round(1281167 / total_batch))
@@ -162,15 +112,13 @@ def get_config(model, fake=False):
                     interp='linear', step_based=True))
 
         if hvd.rank() == 0:
-            #callbacks.append(GPUUtilizationTracker())
-
             # TODO For distributed training, you probably don't want everyone to wait for validation.
             # Better to start a separate job, since the model is saved.
-            # For reproducibility, do not use remote data for validation
-            dataset_val = get_val_data(batch)
-            infs = [ClassificationError('wrong-top1', 'val-error-top1'),
-                    ClassificationError('wrong-top5', 'val-error-top5')]
-            callbacks.append(InferenceRunner(QueueInput(dataset_val), infs))
+            if False:
+                dataset_val = get_val_data(batch)  # For reproducibility, do not use remote data for validation
+                infs = [ClassificationError('wrong-top1', 'val-error-top1'),
+                        ClassificationError('wrong-top5', 'val-error-top5')]
+                callbacks.append(InferenceRunner(QueueInput(dataset_val), infs))
 
     return TrainConfig(
         model=model,
