@@ -12,25 +12,9 @@ This command takes 0.36s per iteration, where each iteration is 1 update to D an
 
 * [tensorpack DCGAN examples](https://github.com/ppwwyyxx/tensorpack/blob/master/examples/GAN/DCGAN.py):
 
-Apply the following diff on DCGAN.py to make a fair comparison:
-```diff
-18c18
-< from GAN import SeparateGANTrainer, RandomZData, GANModelDesc
----
-> from GAN import GANTrainer, RandomZData, GANModelDesc
-39c39
-< opt.BATCH = 64
----
-> opt.BATCH = 128
-166c166
-<         SeparateGANTrainer(config, d_period=2).train()
----
->         GANTrainer(config).train()
+Modify the code to use `SeparateGANTrainer(..., d_period=2)`, and run with:
 ```
-
-And run with:
-```
-python DCGAN.py --data /path/to/img_align_celebA --crop-size 108
+python DCGAN.py --data /path/to/img_align_celebA --crop-size 108 --batch 64
 ```
 
 This script runs at 15.5 it/s, where every two iterations is equivalent to 1 iteration in DCGAN-tensorflow.
