@@ -27,32 +27,42 @@ Run on single machine:
     python3 ./serve-data.py --data ~/data/imagenet/ --batch 64
     mpirun -np 8 --output-filename test.log python3 ./imagenet-resnet-horovod.py -d 50 --data ~/data/imagenet/ --batch 64
 
-Run on multiple machines:
+Run on multiple machines with RoCE/IB:
     host1: python3 ./serve-data.py --data ~/data/imagenet/ --batch 64
     host2: python3 ./serve-data.py --data ~/data/imagenet/ --batch 64
-    mpirun -np 16 -H host1:8,host2:8 --output-filename test.log
-        -x PATH -x PYTHONPATH -x LD_LIBRARY_PATH python3
+    mpirun -np 16 -H host1:8,host2:8 --output-filename test.log \
+        -bind-to none -map-by slot \
+        -mca pml ob1 -mca btl_openib_receive_queues P,128,32:P,2048,32:P,12288,32:P,65536,32 \
+        -x PATH -x PYTHONPATH -x LD_LIBRARY_PATH python3 -x NCCL_DEBUG=INFO \
         ./imagenet-resnet-horovod.py -d 50 --data ~/data/imagenet/ --batch 64
 
     MPI does not like fork(), so running `serve-data.py` inside MPI is not a
     good idea. It actually also makes my data slow, which I don't know why.
     Maybe something specific to my environments.
 
+    Remove some MPI arguments if running with plain TCP.
+    See https://github.com/uber/horovod/blob/master/docs/benchmarks.md for details.
+
 Benchmark data:
 
     python3 ./serve-data.py --data ~/data/imagenet/ --batch 64 --benchmark
-    # Image/s = itr/s * 64
+    # image/s = itr/s * 64
 
 Benchmark training:
     Train with `--fake`.
 
-Performance on V100s:
-    1 machine: 2440 im/s
+Performance on V100s (batch 64):
+    1 machine fake data: 2400 im/s
     2 machine, fake data: 2381 * 2 im/s
     2 machine, true data: 2291 * 2 im/s
 
+Performanec on P100s (batch 64):
+    1 machine fake data: 1638 im/s
+    16 machine, fake data: 1489 * 16im/s
+    16 machine, true data: 1464 * 16im/s
+
 Note:
-    For performance, the epoch length of the master process is the right number to look at.
+    For speed measurement, the epoch length of the master process is the right number to look at.
     Epoch length of workers will be longer because they wait for master to run
     the unnecessary callbacks (save model, evaluation).
 
@@ -115,7 +125,7 @@ def get_config(model, fake=False):
             random=False, dtype=['uint8', 'int32'])
         data = StagingInput(QueueInput(data))
         callbacks = []
-        steps_per_epoch = 100
+        steps_per_epoch = 50
     else:
         logger.info("#Tower: {}; Batch size per tower: {}".format(hvd.size(), batch))
         data = ZMQInput('ipc://@imagenet-train-b{}'.format(batch), 30, bind=False)
@@ -135,7 +145,7 @@ def get_config(model, fake=False):
         and reduce it by 1/10 at the 30-th, 60-th, and 80-th epoch
         """
         callbacks = [
-            ModelSaver(),
+            ModelSaver(max_to_keep=100),
             ScheduledHyperParamSetter(
                 'learning_rate', [(30, BASE_LR * 1e-1), (60, BASE_LR * 1e-2),
                                   (80, BASE_LR * 1e-3)]),
@@ -167,7 +177,7 @@ def get_config(model, fake=False):
         data=data,
         callbacks=callbacks,
         steps_per_epoch=steps_per_epoch,
-        max_epoch=25 if args.fake else 90,
+        max_epoch=35 if args.fake else 90,
     )
 
 
