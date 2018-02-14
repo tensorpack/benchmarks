@@ -20,11 +20,11 @@ $ mpirun -np 8 --output-filename test.log python3 ./imagenet-resnet-horovod.py -
 # Multiple machines with RoCE/IB:
 host1$ ./serve-data.py --data ~/data/imagenet/ --batch 64
 host2$ ./serve-data.py --data ~/data/imagenet/ --batch 64
-mpirun -np 16 -H host1:8,host2:8 --output-filename test.log \
+$ mpirun -np 16 -H host1:8,host2:8 --output-filename test.log \
 		-bind-to none -map-by slot \
 		-mca pml ob1 -mca btl_openib_receive_queues P,128,32:P,2048,32:P,12288,32:P,65536,32 \
-		-x PATH -x PYTHONPATH -x LD_LIBRARY_PATH python3 -x NCCL_DEBUG=INFO \
-		./imagenet-resnet-horovod.py -d 50 --data ~/data/imagenet/ --batch 64
+		-x PATH -x PYTHONPATH -x LD_LIBRARY_PATH -x NCCL_DEBUG=INFO \
+		python3 ./imagenet-resnet-horovod.py -d 50 --data ~/data/imagenet/ --batch 64
 ```
 
 Notes:
@@ -41,9 +41,9 @@ $ ./serve-data.py --data ~/data/imagenet/ --batch 64 --benchmark
 
 ## Distributed ResNet50 Results:
 
-Validation time excluded from total time.
+Validation time excluded from total time. Time depends on your hardware.
 
-|Devices    | per GPU batch | time    | top1 acc |
+|devices    | per GPU batch | time    | top1 acc |
 |   -       |    -          |    -										|   -      |
 | 128 P100s |	32					  | 1h40min  								|  23.62%   |
 | 128 P100s |	64					  | 1h23min  								|  23.97%   |
