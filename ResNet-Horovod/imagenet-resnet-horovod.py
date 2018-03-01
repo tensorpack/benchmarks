@@ -81,7 +81,7 @@ def get_config(model, fake=False):
             'learning_rate', [(30, BASE_LR * 1e-1), (60, BASE_LR * 1e-2),
                               (80, BASE_LR * 1e-3)]),
     ]
-    if BASE_LR != 0.1:
+    if BASE_LR > 0.1:
         """
         Sec 2.2: In practice, with a large minibatch of size kn, we start from a learning rate of η and increment
         it by a constant amount at each iteration such that it reachesη = kη after 5 epochs. After the warmup phase, we go back
@@ -95,9 +95,9 @@ def get_config(model, fake=False):
     if hvd.rank() == 0 and not args.fake:
         # TODO For distributed training, you probably don't want everyone to wait for validation.
         # Better to start a separate job, since the model is saved.
-        if False:
+        if args.run_validation:
             dataset_val = get_imagenet_dataflow(
-                args.data, 'val', batch, fbresnet_augmentor(False))  # For reproducibility, do not use remote data for validation
+                args.data, 'val', 64, fbresnet_augmentor(False))  # For reproducibility, do not use remote data for validation
             infs = [ClassificationError('wrong-top1', 'val-error-top1'),
                     ClassificationError('wrong-top5', 'val-error-top5')]
             callbacks.append(InferenceRunner(QueueInput(dataset_val), infs))
@@ -119,7 +119,8 @@ if __name__ == '__main__':
     parser.add_argument('--fake', help='use fakedata to test or benchmark this model', action='store_true')
     parser.add_argument('-d', '--depth', help='resnet depth',
                         type=int, default=50, choices=[50, 101, 152])
-    parser.add_argument('--eval', action='store_true')
+    parser.add_argument('--eval', action='store_true', help='run evaluation with --load instead of training.')
+    parser.add_argument('--run-validation', action='store_true', help='run validation every epoch on the chief process. will be slow.')
     """
     Sec 2.3: We keep the per-worker sample size n constant when we change the number of workers k.
     In this work, we use n = 32 which has performed well for a wide range of datasets and networks.

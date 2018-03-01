@@ -8,7 +8,8 @@ It follows most settings in the paper
 
 ## Usage:
 
-Install TF>=1.5, tensorpack>=0.8.1, [Horovod](https://github.com/uber/horovod), [zmq_ops](https://github.com/tensorpack/zmq_ops)
+Install TF>=1.5, tensorpack>=0.8.1, [Horovod](https://github.com/uber/horovod), [zmq_ops](https://github.com/tensorpack/zmq_ops).
+Prepare ImageNet data into [this structure](http://tensorpack.readthedocs.io/en/latest/modules/dataflow.dataset.html#tensorpack.dataflow.dataset.ILSVRC12).
 
 ```bash
 # Single Machine:
@@ -43,7 +44,7 @@ $ ./serve-data.py --data ~/data/imagenet/ --batch 64 --benchmark
 
 Validation time excluded from total time. Time depends on your hardware.
 
-|devices    | per GPU batch | time    | top1 acc |
+ |devices   | batch per GPU | time    | top1 err |
 |   -       |    -          |    -										|   -      |
 | 128 P100s |	32					  | 1h40min  								|  23.62%   |
 | 128 P100s |	64					  | 1h23min  								|  23.97%   |

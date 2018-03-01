@@ -21,16 +21,6 @@ def resnet_shortcut(l, n_out, stride, nl=tf.identity):
 
 
 def get_bn(zero_init=False):
-    """
-    Sec 5.1: For BN layers, the learnable scaling coefficient γ is initialized
-    to be 1, except for each residual block's last BN
-    where γ is initialized to be 0. Setting γ = 0 in the last BN of
-    each residual block causes the forward/backward signal initially
-    to propagate through the identity shortcut of ResNets,
-    which we found to ease optimization at the start of training.
-    This initialization improves all models but is particularly
-    helpful for large minibatch training as we will show.'
-    """
     if zero_init:
         return lambda x, name: BatchNorm('bn', x, gamma_init=tf.zeros_initializer())
     else:

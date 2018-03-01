@@ -252,7 +252,7 @@ if __name__ == '__main__':
             MergeAllSummaries(),
             RunUpdateOps()
         ],
-        session_config=sessconf,
+        session_config=sessconf if not args.job else None,
         steps_per_epoch=50,
         max_epoch=10,
     )
