@@ -9,6 +9,8 @@ It gets down to 0.65 test logloss in 25 epochs, and down to 0.55 after 50 epochs
 '''
 
 from __future__ import print_function
+import keras
+keras.backend.set_image_data_format('channels_first')
 from keras.models import Model
 from keras.utils import np_utils
 from keras.layers import Flatten
@@ -25,7 +27,10 @@ nb_epoch = 200
 
 img_rows, img_cols = 224, 224
 
-X_train = np.random.random((batch_size, img_rows, img_cols, 3))
+if keras.backend.image_data_format() == 'channels_first':
+    X_train = np.random.random((batch_size, 3, img_rows, img_cols))
+else:
+    X_train = np.random.random((batch_size, img_rows, img_cols, 3))
 Y_train = np.random.random((batch_size,)).astype('int32')
 Y_train = np_utils.to_categorical(Y_train, nb_classes)
 

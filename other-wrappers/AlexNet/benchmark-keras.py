@@ -9,6 +9,8 @@ It gets down to 0.65 test logloss in 25 epochs, and down to 0.55 after 50 epochs
 '''
 
 from __future__ import print_function
+import keras
+keras.backend.set_image_data_format('channels_first')
 from keras.datasets import cifar10
 from keras.preprocessing.image import ImageDataGenerator
 from keras.models import Sequential
@@ -17,16 +19,16 @@ from keras.layers import Convolution2D, MaxPooling2D
 from keras.utils import np_utils
 import numpy as np
 
-import keras
-keras.backend.set_image_data_format('channels_last')
-
 batch_size = 64
 nb_classes = 1000
 nb_epoch = 200
 
 img_rows, img_cols = 224, 224
 
-X_train = np.random.random((batch_size, img_rows, img_cols, 3)).astype('float32')
+if keras.backend.image_data_format() == 'channels_first':
+    X_train = np.random.random((batch_size, 3, img_rows, img_cols)).astype('float32')
+else:
+    X_train = np.random.random((batch_size, img_rows, img_cols, 3)).astype('float32')
 Y_train = np.random.random((batch_size,)).astype('int32')
 Y_train = np_utils.to_categorical(Y_train, nb_classes)
 

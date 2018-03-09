@@ -9,14 +9,14 @@ It gets down to 0.65 test logloss in 25 epochs, and down to 0.55 after 50 epochs
 '''
 
 from __future__ import print_function
+import keras
+keras.backend.set_image_data_format('channels_first')
 from keras.datasets import cifar10
 from keras.preprocessing.image import ImageDataGenerator
 from keras.models import Sequential
 from keras.layers import Dense, Dropout, Activation, Flatten
 from keras.layers import Convolution2D, MaxPooling2D
 from keras.utils import np_utils
-#import keras
-#keras.backend.set_image_data_format('channels_first')
 
 batch_size = 32
 nb_classes = 10

@@ -61,18 +61,16 @@ class Model(ModelDesc):
 
 
 def get_data(train_or_test):
-    return FakeData([[BATCH, 224,224, 3], [BATCH]], dtype=['float32', 'int32'])
+    return FakeData([[BATCH, 224,224, 3], [BATCH]], dtype=['float32', 'int32'], random=False)
 
 if __name__ == '__main__':
     logger.auto_set_dir('d')
     dataset_train = get_data('train')
     config = TrainConfig(
         model=Model(),
-        data=QueueInput(
-            dataset_train,
-            queue=tf.FIFOQueue(300, [tf.float32, tf.int32])),
+        data=QueueInput(dataset_train),
         callbacks=[],
-        # keras monitor these two live data during training. do it here (no overhead actually)
+        # keras monitor these two live data during training. mimic it here (no overhead actually)
         extra_callbacks=[ProgressBar(['cost', 'train_error'])],
         max_epoch=200,
         steps_per_epoch=50,
