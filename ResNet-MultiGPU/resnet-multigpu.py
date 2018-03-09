@@ -56,6 +56,7 @@ class Model(ModelDesc):
 
         loss = tf.nn.sparse_softmax_cross_entropy_with_logits(logits=logits, labels=label)
         loss = tf.reduce_mean(loss, name='xentropy-loss')
+        # TODO tensorflow/benchmark only computes WD on 1 GPU.
         if False:
             self.cost = loss    # disable wd
         else:
@@ -149,8 +150,13 @@ def get_data(mode):
         def fn():
             # these copied from tensorflow/benchmarks
             with tf.device('/cpu:0'):
-                images = tf.truncated_normal(
-                    input_shape, dtype=IMAGE_DTYPE, stddev=1e-1, name='synthetic_images')
+                if IMAGE_DTYPE == tf.float32:
+                    images = tf.truncated_normal(
+                        input_shape, dtype=IMAGE_DTYPE, stddev=0.1, name='synthetic_images')
+                else:
+                    images = tf.random_uniform(
+                        input_shape, minval=0, maxval=255, dtype=tf.int32, name='synthetic_images')
+                    images = tf.cast(images, IMAGE_DTYPE)
                 labels = tf.random_uniform(
                     label_shape, minval=1, maxval=1000, dtype=tf.int32, name='synthetic_labels')
                 # images = tf.contrib.framework.local_variable(images, name='images')
@@ -164,7 +170,7 @@ def get_data(mode):
         return StagingInput(ret, nr_stage=1)
     elif mode == 'python-dataset':
         ds = TFDatasetInput.dataflow_to_dataset(dataflow, [IMAGE_DTYPE, tf.int32])
-        ds = ds.prefetch(args.prefetch)
+        ds = ds.repeat().prefetch(args.prefetch)
         ret = TFDatasetInput(ds)
         return StagingInput(ret, nr_stage=1)
     elif mode == 'zmq-serve':
@@ -244,11 +250,11 @@ if __name__ == '__main__':
         model=M(data_format=args.data_format),
         callbacks=[
             GPUUtilizationTracker(),
-            # ModelSaver(checkpoint_dir='./tmpmodel'),
+            # ModelSaver(checkpoint_dir='./tmpmodel'),  # it takes time
         ],
         extra_callbacks=[
-            # MovingAverageSummary(),
-            ProgressBar(),
+            # MovingAverageSummary(),   # tensorflow/benchmarks does not do this
+            ProgressBar(),  # nor this
             MergeAllSummaries(),
             RunUpdateOps()
         ],
