@@ -33,6 +33,6 @@ Notes:
 1. Keras and tflearn scripts are copied from their official examples and slightly modified
 	to make sure they are doing equivalent work.
 2. With a better (but not equivalent) setting in [../ResNet-MultiGPU/](../ResNet-MultiGPU/),
-	tensorpack can actually reach 1700 im/s for ResNet50.
+	tensorpack can actually reach 1600 im/s for ResNet50.
 3. You can train a Keras model in tensorpack and enjoy its speed.
 See [Keras+Tensorpack example](https://github.com/ppwwyyxx/tensorpack/tree/master/examples/keras).

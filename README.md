@@ -4,7 +4,7 @@
 We use TensorFlow in the efficient way. [tensorpack](https://github.com/ppwwyyxx/tensorpack) is:
 
 * [As fast as tensorflow/benchmarks in MultiGPU ResNet training](ResNet-MultiGPU/)
-* [1.1x~2x faster than Keras/tflearn in various CNNs](other-wrappers/)
+* [1.1x~3.5x faster than Keras/tflearn in various CNNs](other-wrappers/)
 * [Able to train ImageNet in about an hour](ResNet-Horovod/)
 * [2.8x faster than DCGAN-tensorflow](DCGAN/)
 
