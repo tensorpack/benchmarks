@@ -7,7 +7,8 @@ from keras.utils import np_utils
 from keras.layers import *
 import numpy as np
 
-batch_size = 64
+NUM_GPU = 1
+batch_size = 64 * NUM_GPU
 nb_classes = 1000
 nb_epoch = 200
 
@@ -60,6 +61,9 @@ x = Dense(4096, activation='relu', name='fc2')(x)
 x = Dense(nb_classes, activation='softmax', name='predictions')(x)
 
 model = Model(img_input, x, name='vgg16')
+
+if NUM_GPU != 1:
+    model = keras.utils.multi_gpu_model(model, NUM_GPU)
 
 # Let's train the model using RMSprop
 model.compile(loss='categorical_crossentropy',

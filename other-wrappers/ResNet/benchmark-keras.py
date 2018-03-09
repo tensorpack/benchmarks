@@ -6,7 +6,8 @@ from keras.applications.resnet50 import ResNet50
 from keras.utils import np_utils
 import numpy as np
 
-batch_size = 32
+NUM_GPU = 1
+batch_size = 32 * NUM_GPU
 
 img_rows, img_cols = 224, 224
 
@@ -23,10 +24,12 @@ def gen():
 
 model = ResNet50(weights=None, input_shape=X_train.shape[1:])
 
+if NUM_GPU != 1:
+    model = keras.utils.multi_gpu_model(model, gpus=NUM_GPU)
+
 for l in model.layers:
     print(l.input_shape, l.output_shape)
 
-# Let's train the model using RMSprop
 model.compile(loss='categorical_crossentropy',
               optimizer='sgd', metrics=['accuracy'])
 

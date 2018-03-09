@@ -67,7 +67,7 @@ if __name__ == '__main__':
     dataset_train = get_data('train')
     config = TrainConfig(
         model=Model(),
-        data=QueueInput(dataset_train),
+        data=StagingInput(QueueInput(dataset_train)),
         callbacks=[],
         # keras monitor these two live data during training. mimic it here (no overhead actually)
         extra_callbacks=[ProgressBar(['cost', 'train_error'])],

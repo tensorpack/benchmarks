@@ -3,9 +3,13 @@
 # File: benchmark-tensorpack.py
 import tensorflow as tf
 from tensorpack import *
-import tensorpack.tfutils.symbolic_functions as symbf
 
 BATCH = 32
+NUM_GPU = 1
+
+
+def prediction_incorrect(logits, label, topk=1, name='incorrect_vector'):
+    return tf.cast(tf.logical_not(tf.nn.in_top_k(logits, label, topk)), tf.float32, name=name)
 
 
 def resnet_shortcut(l, n_out, stride, nl=tf.identity):
@@ -63,7 +67,7 @@ class Model(ModelDesc):
         cost = tf.nn.sparse_softmax_cross_entropy_with_logits(logits=logits, labels=label)
         self.cost = tf.reduce_mean(cost, name='cost')
 
-        wrong = symbf.prediction_incorrect(logits, label)
+        wrong = prediction_incorrect(logits, label)
         tf.reduce_mean(wrong, name='train_error')
         # no weight decay
 
@@ -75,15 +79,13 @@ def get_data(train_or_test):
     return FakeData([[BATCH, 224,224, 3], [BATCH]], dtype=['float32', 'int32'], random=False)
 
 if __name__ == '__main__':
-    logger.auto_set_dir('d')
     dataset_train = get_data('train')
     config = TrainConfig(
         model=Model(),
-        data=QueueInput(dataset_train),
+        dataflow=dataset_train,
         callbacks=[],
-        # keras monitor these two live data during training. mimic it here (no overhead actually)
-        extra_callbacks=[ProgressBar(['cost', 'train_error'])],
         max_epoch=100,
         steps_per_epoch=50,
     )
-    launch_train_with_config(config, SimpleTrainer())
+    trainer = SyncMultiGPUTrainerReplicated(NUM_GPU)  # change to 8 to benchmark multigpu
+    launch_train_with_config(config, trainer)

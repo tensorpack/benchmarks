@@ -7,7 +7,8 @@ from keras.layers import *
 from keras.utils import np_utils
 import numpy as np
 
-batch_size = 64
+NUM_GPU = 1
+batch_size = 64 * NUM_GPU
 nb_classes = 1000
 nb_epoch = 200
 
@@ -52,6 +53,9 @@ model.add(Activation('softmax'))
 
 for l in model.layers:
     print(l.input_shape, l.output_shape)
+
+if NUM_GPU != 1:
+    model = keras.utils.multi_gpu_model(model, NUM_GPU)
 
 # Let's train the model using RMSprop
 model.compile(loss='categorical_crossentropy',
