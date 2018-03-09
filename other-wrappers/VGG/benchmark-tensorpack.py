@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: UTF-8 -*-
 # File: benchmark-tensorpack.py
-# Author: Yuxin Wu <ppwwyyxxc@gmail.com>
 import tensorflow as tf
 from tensorpack import *
 import tensorpack.tfutils.symbolic_functions as symbf
