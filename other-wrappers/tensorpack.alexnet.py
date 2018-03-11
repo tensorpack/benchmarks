@@ -2,22 +2,21 @@
 # -*- coding: UTF-8 -*-
 # File: tensorpack.alexnet.py
 import tensorflow as tf
+import numpy as np
 from tensorpack import *
-import tensorpack.tfutils.symbolic_functions as symbf
 
 BATCH = 64
 
 class Model(ModelDesc):
     def _get_inputs(self):
-        return [InputDesc(tf.float32, [BATCH, 224, 224, 3], 'input'),
+        return [InputDesc(tf.float32, [BATCH, 3, 224, 224], 'input'),
                 InputDesc(tf.int32, [BATCH], 'label') ]
 
     def _build_graph(self, inputs):
         image, label = inputs
-        image = tf.transpose(image, [0, 3, 1, 2])
         image = image / 255.0
 
-        with argscope(Conv2D, nl=tf.nn.relu, kernel_shape=3), \
+        with argscope(Conv2D, activation=tf.nn.relu, kernel_shape=3), \
                 argscope([Conv2D, MaxPooling], data_format='NCHW'):
             logits = (LinearWrap(image)
                       .Conv2D('conv1_1', 64, kernel_shape=11, stride=4, padding='VALID')
@@ -30,27 +29,26 @@ class Model(ModelDesc):
                       .Conv2D('conv5', 256)
                       .MaxPooling('pool3', 3, 2)
 
-                      .FullyConnected('fc6', 4096, nl=tf.nn.relu)
-                      .Dropout('drop0', 0.5)
-                      .FullyConnected('fc7', 4096, nl=tf.nn.relu)
-                      .Dropout('drop1', 0.5)
-                      .FullyConnected('fc8', out_dim=1000, nl=tf.identity)())
+                      .FullyConnected('fc6', 4096, activation=tf.nn.relu)
+                      .Dropout('drop0', rate=0.5)
+                      .FullyConnected('fc7', 4096, activation=tf.nn.relu)
+                      .Dropout('drop1', rate=0.5)
+                      .FullyConnected('fc8', out_dim=1000)())
 
         cost = tf.nn.sparse_softmax_cross_entropy_with_logits(logits=logits, labels=label)
         self.cost = tf.reduce_mean(cost, name='cost')
 
-        wrong = symbf.prediction_incorrect(logits, label)
-        tf.reduce_mean(wrong, name='train_error')
-        # no weight decay
-
     def _get_optimizer(self):
-        # keras default is 1e-3
-        lr = symbf.get_scalar_var('learning_rate', 1e-3, summary=True)
-        return tf.train.RMSPropOptimizer(lr, epsilon=1e-8)
+        return tf.train.RMSPropOptimizer(1e-3, epsilon=1e-8)
 
 
 def get_data():
-    return FakeData([[BATCH, 224,224, 3], [BATCH]], random=False, dtype=['float32', 'int32'])
+    X_train = np.random.random((BATCH, 3, 224, 224)).astype('float32')
+    Y_train = np.random.random((BATCH,)).astype('int32')
+    def gen():
+        while True:
+            yield [X_train, Y_train]
+    return DataFromGenerator(gen)
 
 if __name__ == '__main__':
     dataset_train = get_data()
@@ -58,8 +56,7 @@ if __name__ == '__main__':
         model=Model(),
         data=QueueInput(dataset_train),
         callbacks=[],
-        # keras monitor these two live data during training. do it here (no overhead actually)
-        extra_callbacks=[ProgressBar(['cost', 'train_error'])],
+        extra_callbacks=[ProgressBar(['cost'])],
         max_epoch=100,
         steps_per_epoch=200,
     )

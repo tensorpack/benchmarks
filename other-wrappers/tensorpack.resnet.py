@@ -1,33 +1,28 @@
 #!/usr/bin/env python
 # -*- coding: UTF-8 -*-
-# File: benchmark-tensorpack.py
+# File: tensorpack.resnet.py
 import tensorflow as tf
+import numpy as np
 from tensorpack import *
 
-BATCH = 32
+BATCH = 32  # tensorpack's "batch" is per-GPU batch.
 NUM_GPU = 1
 
-
-def prediction_incorrect(logits, label, topk=1, name='incorrect_vector'):
-    return tf.cast(tf.logical_not(tf.nn.in_top_k(logits, label, topk)), tf.float32, name=name)
-
-
-def resnet_shortcut(l, n_out, stride, nl=tf.identity):
-    data_format = get_arg_scope()['Conv2D']['data_format']
-    n_in = l.get_shape().as_list()[1 if data_format == 'NCHW' else 3]
+def resnet_shortcut(l, n_out, stride, activation=tf.identity):
+    data_format = 'NCHW'
+    n_in = l.get_shape().as_list()[1]
     if n_in != n_out:   # change dimension when channel is not the same
-        return Conv2D('convshortcut', l, n_out, 1, stride=stride, nl=nl)
+        return Conv2D('convshortcut', l, n_out, 1, stride=stride, activation=activation)
     else:
         return l
 
-
 def block_func(l, ch_out, stride):
-    BN = lambda x, name: BatchNorm('bn', x)
+    BN = lambda x: BatchNorm('bn', x)
     shortcut = l
-    l = Conv2D('conv1', l, ch_out, 1, stride=stride, nl=BNReLU)
-    l = Conv2D('conv2', l, ch_out, 3, stride=1, nl=BNReLU)
-    l = Conv2D('conv3', l, ch_out * 4, 1, nl=BN)
-    return l + resnet_shortcut(shortcut, ch_out * 4, stride, nl=BN)
+    l = Conv2D('conv1', l, ch_out, 1, stride=stride, activation=BNReLU)
+    l = Conv2D('conv2', l, ch_out, 3, stride=1, activation=BNReLU)
+    l = Conv2D('conv3', l, ch_out * 4, 1, activation=BN)
+    return tf.nn.relu(l + resnet_shortcut(shortcut, ch_out * 4, stride, activation=BN))
 
 
 def group_func(l, name, block_func, features, count, stride):
@@ -35,19 +30,16 @@ def group_func(l, name, block_func, features, count, stride):
         for i in range(0, count):
             with tf.variable_scope('block{}'.format(i)):
                 l = block_func(l, features, stride if i == 0 else 1)
-                # end of each block need an activation
-                l = tf.nn.relu(l)
     return l
 
 
 class Model(ModelDesc):
     def _get_inputs(self):
-        return [InputDesc(tf.float32, [None, 224, 224, 3], 'input'),
+        return [InputDesc(tf.float32, [None, 3, 224, 224], 'input'),
                 InputDesc(tf.int32, [None], 'label') ]
 
     def _build_graph(self, inputs):
         image, label = inputs
-        image = tf.transpose(image, [0, 3, 1, 2])
         image = image / 255.0
 
         num_blocks = [3, 4, 6, 3]
@@ -55,31 +47,32 @@ class Model(ModelDesc):
                 argscope(Conv2D, use_bias=False):
             logits = (LinearWrap(image)
                       .tf.pad([[0, 0], [3, 3], [3, 3], [0, 0]])
-                      .Conv2D('conv0', 64, 7, stride=2, nl=BNReLU, padding='VALID')
+                      .Conv2D('conv0', 64, 7, stride=2, activation=BNReLU, padding='VALID')
                       .MaxPooling('pool0', shape=3, stride=2, padding='SAME')
                       .apply(group_func, 'group0', block_func, 64, num_blocks[0], 1)
                       .apply(group_func, 'group1', block_func, 128, num_blocks[1], 2)
                       .apply(group_func, 'group2', block_func, 256, num_blocks[2], 2)
                       .apply(group_func, 'group3', block_func, 512, num_blocks[3], 2)
                       .GlobalAvgPooling('gap')
-                      .FullyConnected('linear', 1000, nl=tf.identity)())
+                      .FullyConnected('linear', 1000, activation=tf.identity)())
 
         cost = tf.nn.sparse_softmax_cross_entropy_with_logits(logits=logits, labels=label)
         self.cost = tf.reduce_mean(cost, name='cost')
-
-        wrong = prediction_incorrect(logits, label)
-        tf.reduce_mean(wrong, name='train_error')
-        # no weight decay
 
     def _get_optimizer(self):
         return tf.train.GradientDescentOptimizer(1e-3)
 
 
-def get_data(train_or_test):
-    return FakeData([[BATCH, 224,224, 3], [BATCH]], dtype=['float32', 'int32'], random=False)
+def get_data():
+    X_train = np.random.random((BATCH, 3, 224, 224)).astype('float32')
+    Y_train = np.random.random((BATCH,)).astype('int32')
+    def gen():
+        while True:
+            yield [X_train, Y_train]
+    return DataFromGenerator(gen)
 
 if __name__ == '__main__':
-    dataset_train = get_data('train')
+    dataset_train = get_data()
     config = TrainConfig(
         model=Model(),
         dataflow=dataset_train,
@@ -87,5 +80,5 @@ if __name__ == '__main__':
         max_epoch=100,
         steps_per_epoch=50,
     )
-    trainer = SyncMultiGPUTrainerReplicated(NUM_GPU)  # change to 8 to benchmark multigpu
+    trainer = SyncMultiGPUTrainerReplicated(NUM_GPU)
     launch_train_with_config(config, trainer)
