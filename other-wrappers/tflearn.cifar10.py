@@ -42,12 +42,12 @@ network = input_data(shape=[None, 32, 32, 3],
                      data_preprocessing=img_prep,
                      data_augmentation=img_aug)
 network = conv_2d(network, 32, 3, activation='relu')
-network = conv_2d(network, 32, 3, activation='relu')
+network = conv_2d(network, 32, 3, activation='relu', padding='valid')
 network = max_pool_2d(network, 2)
 network = dropout(network, 0.5)
 
 network = conv_2d(network, 64, 3, activation='relu')
-network = conv_2d(network, 64, 3, activation='relu')
+network = conv_2d(network, 64, 3, activation='relu', padding='valid')
 network = max_pool_2d(network, 2)
 network = dropout(network, 0.5)
 network = fully_connected(network, 512, activation='relu')
@@ -55,9 +55,9 @@ network = dropout(network, 0.5)
 network = fully_connected(network, 10, activation='softmax')
 network = regression(network, optimizer='rmsprop',
                      loss='categorical_crossentropy',
-                     learning_rate=0.001)
+                     learning_rate=0.0001)
 
 # Train using classifier
 model = tflearn.DNN(network, tensorboard_verbose=0)
-model.fit(X, Y, n_epoch=50, shuffle=False,
+model.fit(X, Y, n_epoch=50, shuffle=True,
           show_metric=True, batch_size=32, run_id='cifar10_cnn')

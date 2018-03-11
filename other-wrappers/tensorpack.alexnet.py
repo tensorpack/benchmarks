@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: UTF-8 -*-
-# File: benchmark-tensorpack.py
+# File: tensorpack.alexnet.py
 import tensorflow as tf
 from tensorpack import *
 import tensorpack.tfutils.symbolic_functions as symbf
@@ -49,19 +49,18 @@ class Model(ModelDesc):
         return tf.train.RMSPropOptimizer(lr, epsilon=1e-8)
 
 
-def get_data(train_or_test):
+def get_data():
     return FakeData([[BATCH, 224,224, 3], [BATCH]], random=False, dtype=['float32', 'int32'])
 
 if __name__ == '__main__':
-    logger.auto_set_dir('d')
-    dataset_train = get_data('train')
+    dataset_train = get_data()
     config = TrainConfig(
         model=Model(),
         data=QueueInput(dataset_train),
         callbacks=[],
         # keras monitor these two live data during training. do it here (no overhead actually)
-        #extra_callbacks=[ProgressBar(['cost', 'train_error'])],
-        max_epoch=200,
+        extra_callbacks=[ProgressBar(['cost', 'train_error'])],
+        max_epoch=100,
         steps_per_epoch=200,
     )
     launch_train_with_config(config, SimpleTrainer())

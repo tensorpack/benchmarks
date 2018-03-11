@@ -10,7 +10,6 @@ import numpy as np
 NUM_GPU = 1
 batch_size = 64 * NUM_GPU
 nb_classes = 1000
-nb_epoch = 200
 
 img_rows, img_cols = 224, 224
 
@@ -62,4 +61,4 @@ model.compile(loss='categorical_crossentropy',
               optimizer='rmsprop',
               metrics=['accuracy'])
 
-model.fit_generator(gen(), epochs=nb_epoch, steps_per_epoch=200)
+model.fit_generator(gen(), epochs=100, steps_per_epoch=200)

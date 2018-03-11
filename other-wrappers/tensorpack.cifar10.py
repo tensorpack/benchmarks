@@ -1,29 +1,8 @@
 #!/usr/bin/env python
 # -*- coding: UTF-8 -*-
-# File: benchmark-tensorpack.py
+# File: tensorpack.cifar10.py
 import tensorflow as tf
 from tensorpack import *
-import tensorpack.tfutils.symbolic_functions as symbf
-
-"""
-This script benchmarks a tiny CNN training with tensorpack.
-
-It is meant to be an equivalent of the official keras example at:
-https://github.com/fchollet/keras/blob/master/examples/cifar10_cnn.py
-with its `data_augmentation` option set to False (so that we only compare the training).
-
-On machine with Tesla M40 + TensorFlow 1.3.0rc1 + cuda 8.0 + cudnn v6,
-this script takes 8.5 seconds per epoch.
-
-Keras with TensorFlow backend takes 14 seconds per epoch,
-tflearn takes 14 seconds per epoch.
-
-Note that this CNN is too small to fully utilize GPU, and the datasets are
-too small to show any copy latency.
-Therefore the advantage of tensorpack cannot be fully demonstrated.
-
-I expect a larger performance gap on larger datasets & larger networks.
-"""
 
 class Model(ModelDesc):
     def _get_inputs(self):
@@ -35,31 +14,30 @@ class Model(ModelDesc):
         image = tf.transpose(image, [0, 3, 1, 2])
         image = image / 255.0
 
-        with argscope(Conv2D, nl=tf.nn.relu, kernel_shape=3), \
+        with argscope(Conv2D, nl=tf.nn.relu, kernel_shape=3, padding='VALID'), \
                 argscope([Conv2D, MaxPooling], data_format='NCHW'):
             logits = (LinearWrap(image)
-                      .Conv2D('conv0', 32)
+                      .Conv2D('conv0', 32, padding='SAME')
                       .Conv2D('conv1', 32)
                       .MaxPooling('pool0', 2)
-                      .Dropout(0.75)    # keras use drop prob, but we use keep prob
-                      .Conv2D('conv2', 64)
+                      .Dropout(rate=0.25)
+                      .Conv2D('conv2', 64, padding='SAME')
                       .Conv2D('conv3', 64)
                       .MaxPooling('pool1', 2)
-                      .Dropout(0.75)
+                      .Dropout(rate=0.25)
                       .FullyConnected('fc1', 512, nl=tf.nn.relu)
-                      .Dropout(0.5)
+                      .Dropout(rate=0.5)
                       .FullyConnected('linear', 10, nl=tf.identity)())
 
         cost = tf.nn.sparse_softmax_cross_entropy_with_logits(logits=logits, labels=label)
         self.cost = tf.reduce_mean(cost, name='cost')
 
-        wrong = symbf.prediction_incorrect(logits, label)
+        wrong = tf.cast(tf.logical_not(tf.nn.in_top_k(logits, label, 1)), tf.float32, name='wrong')
         tf.reduce_mean(wrong, name='train_error')
         # no weight decay
 
     def _get_optimizer(self):
-        # keras default is 1e-3
-        lr = tf.get_variable('learning_rate', initializer=1e-3, trainable=False)
+        lr = tf.get_variable('learning_rate', initializer=1e-4, trainable=False)
         return tf.train.RMSPropOptimizer(lr, epsilon=1e-8)
 
 
@@ -70,14 +48,14 @@ def get_data(train_or_test):
     return ds
 
 if __name__ == '__main__':
-    logger.auto_set_dir('d')
     dataset_train = get_data('train')
     dataset_test = get_data('test')
     config = TrainConfig(
         model=Model(),
         data=QueueInput(dataset_train,
                         queue=tf.FIFOQueue(300, [tf.float32, tf.int32])),
-        callbacks=[InferenceRunner(dataset_test, ClassificationError())],
+        #callbacks=[InferenceRunner(dataset_test, ClassificationError('wrong'))],   # skip validation
+        callbacks=[],
         # keras monitor these two live data during training. do it here (no overhead actually)
         extra_callbacks=[ProgressBar(['cost', 'train_error']), MergeAllSummaries()],
         max_epoch=200,
