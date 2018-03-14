@@ -94,7 +94,7 @@ class TensorpackModel(Model):
     def _get_logits(self, image):
         def shortcut(l, n_in, n_out, stride):
             if n_in != n_out:
-                l = Conv2D('convshortcut', l, n_out, 1, stride=stride)
+                l = Conv2D('convshortcut', l, n_out, 1, strides=stride)
                 l = BatchNorm('bnshortcut', l)
                 return l
             else:
@@ -103,9 +103,9 @@ class TensorpackModel(Model):
         def bottleneck(l, ch_out, stride, preact):
             ch_in = l.get_shape().as_list()[1]
             input = l
-            l = Conv2D('conv1', l, ch_out, 1, stride=stride, nl=BNReLU)
-            l = Conv2D('conv2', l, ch_out, 3, stride=1, nl=BNReLU)
-            l = Conv2D('conv3', l, ch_out * 4, 1, nl=tf.identity)
+            l = Conv2D('conv1', l, ch_out, 1, strides=stride, activation=BNReLU)
+            l = Conv2D('conv2', l, ch_out, 3, strides=1, activation=BNReLU)
+            l = Conv2D('conv3', l, ch_out * 4, 1, activation=tf.identity)
             l = BatchNorm('bn', l)
             ret = l + shortcut(input, ch_in, ch_out * 4, stride)
             return tf.nn.relu(ret)
@@ -122,18 +122,20 @@ class TensorpackModel(Model):
 
         defs = [3, 4, 6, 3]
 
-        with argscope(Conv2D, nl=tf.identity, use_bias=False,
-                      W_init=variance_scaling_initializer(mode='FAN_OUT')), \
+        with argscope(Conv2D, use_bias=False,
+                      kernel_initializer=variance_scaling_initializer(mode='FAN_OUT')), \
                 argscope([Conv2D, MaxPooling, GlobalAvgPooling, BatchNorm], data_format=self.data_format):
             logits = (LinearWrap(image)
-                      .Conv2D('conv0', 64, 7, stride=2, nl=BNReLU)
-                      .MaxPooling('pool0', shape=3, stride=2, padding='SAME')
+                      .Conv2D('conv0', 64, 7, strides=2)
+                      .BatchNorm('bn0')
+                      .tf.nn.relu()
+                      .MaxPooling('pool0', 3, strides=2, padding='SAME')
                       .apply(layer, 'group0', bottleneck, 64, defs[0], 1, first=True)
                       .apply(layer, 'group1', bottleneck, 128, defs[1], 2)
                       .apply(layer, 'group2', bottleneck, 256, defs[2], 2)
                       .apply(layer, 'group3', bottleneck, 512, defs[3], 2)
                       .GlobalAvgPooling('gap')
-                      .FullyConnected('linear', 1000, nl=tf.identity)())
+                      .FullyConnected('linear', 1000)())
         return logits
 
 
@@ -238,7 +240,7 @@ if __name__ == '__main__':
         else:
             trainer = {
                 'replicated': lambda: SyncMultiGPUTrainerReplicated(
-                    NR_GPU, average=False, use_nccl=False),
+                    NR_GPU, average=False, mode='cpu'),
                     # this is the actual configuration used by tfbench
                 'horovod': lambda: HorovodTrainer(),
                 'parameter_server': lambda: SyncMultiGPUTrainerParameterServer(NR_GPU, ps_device='cpu')

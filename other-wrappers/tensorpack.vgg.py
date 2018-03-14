@@ -17,8 +17,8 @@ class Model(ModelDesc):
         image, label = inputs
         image = image / 255.0
 
-        with argscope(Conv2D, activation=tf.nn.relu, kernel_shape=3), \
-                argscope([Conv2D, MaxPooling], data_format='NCHW'):
+        with argscope(Conv2D, activation=tf.nn.relu, kernel_size=3), \
+                argscope([Conv2D, MaxPooling], data_format='channels_first'):
             logits = (LinearWrap(image)
                       .Conv2D('conv1_1', 64)
                       .Conv2D('conv1_2', 64)
@@ -45,7 +45,7 @@ class Model(ModelDesc):
                       # 7
                       .FullyConnected('fc6', 4096, activation=tf.nn.relu)
                       .FullyConnected('fc7', 4096, activation=tf.nn.relu)
-                      .FullyConnected('fc8', out_dim=1000)())
+                      .FullyConnected('fc8', 1000, activation=tf.identity)())
 
         cost = tf.nn.sparse_softmax_cross_entropy_with_logits(logits=logits, labels=label)
         self.cost = tf.reduce_mean(cost, name='cost')

@@ -14,7 +14,7 @@ class Model(ModelDesc):
         image = tf.transpose(image, [0, 3, 1, 2])
         image = image / 255.0
 
-        with argscope(Conv2D, nl=tf.nn.relu, kernel_shape=3, padding='VALID'), \
+        with argscope(Conv2D, activation=tf.nn.relu, kernel_size=3, padding='VALID'), \
                 argscope([Conv2D, MaxPooling], data_format='NCHW'):
             logits = (LinearWrap(image)
                       .Conv2D('conv0', 32, padding='SAME')
@@ -25,9 +25,9 @@ class Model(ModelDesc):
                       .Conv2D('conv3', 64)
                       .MaxPooling('pool1', 2)
                       .Dropout(rate=0.25)
-                      .FullyConnected('fc1', 512, nl=tf.nn.relu)
+                      .FullyConnected('fc1', 512, activation=tf.nn.relu)
                       .Dropout(rate=0.5)
-                      .FullyConnected('linear', 10, nl=tf.identity)())
+                      .FullyConnected('linear', 10, activation=tf.identity)())
 
         cost = tf.nn.sparse_softmax_cross_entropy_with_logits(logits=logits, labels=label)
         self.cost = tf.reduce_mean(cost, name='cost')
