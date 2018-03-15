@@ -240,8 +240,8 @@ if __name__ == '__main__':
         else:
             trainer = {
                 'replicated': lambda: SyncMultiGPUTrainerReplicated(
-                    NR_GPU, average=False, mode='cpu'),
-                    # this is the actual configuration used by tfbench
+                    NR_GPU, average=False, mode='hierarchical' if NR_GPU >= 8 else 'cpu'),
+                    # average=False is the actual configuration used by tfbench
                 'horovod': lambda: HorovodTrainer(),
                 'parameter_server': lambda: SyncMultiGPUTrainerParameterServer(NR_GPU, ps_device='cpu')
             }[args.variable_update]()

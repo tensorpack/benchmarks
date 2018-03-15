@@ -37,10 +37,10 @@ It's also faster than `tensorflow/benchmarks` (tested on Jan 6 2018 with TF1.5.0
 
 ## Performance (image/second):
 
-The following was tested with: TF v1.3.0-rc1-1302-g593dc8e on a single DGX1.
+The following was tested with: TF v1.3.0-rc1-1302-g593dc8e on 8 P100s.
 Experiments were not run for multiple times. So expect some variance in results.
 
-variable-update=replicated:
+`variable-update=replicated`:
 
 | #GPU			| tensorpack(GPU/CPU/Python) | tensorflow/benchmarks |
 | --------- | ----------------------	| --------------------  |
@@ -49,7 +49,7 @@ variable-update=replicated:
 | 4					| 802/785/787							|	789.51								|
 | 8					|	1612/1579/1551					|	1580.58								|
 
-variable-update=parameter_server:
+`variable-update=parameter_server`:
 
 | #GPU			| tensorpack(GPU/CPU/Python) | tensorflow/benchmarks  |
 | --------- | -------------------				 | --------------------   |
@@ -57,3 +57,6 @@ variable-update=parameter_server:
 | 2					|	428/418/403								 |  421.01								|
 | 4					|	817/802/787								 |	828.29								|
 | 8					|	1651/1556/1574	  				 |	1604.55								|
+
+## Latest Best Numbers:
+With TF v1.6.0 and option `--fake-location=gpu --variable-update=replicated`: 1777 image/s on P100s, 2600 image/s on V100s.

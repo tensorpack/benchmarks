@@ -4,7 +4,7 @@
 
 * Hardware: AWS p3.16xlarge (8 Tesla V100s)
 * Software:
-Python 3.6, TF 1.6.0, cudnn 7.0.5, Keras 2.1.5, tflearn 0.3.2, tensorpack 0.8.2.
+Python 3.6, TF 1.6.0, cuda 9, cudnn 7.0.5, Keras 2.1.5, tflearn 0.3.2, tensorpack 0.8.3.
 * Measurement: speed is measured by images per second. First epoch is warmup and
 	is not considered in timing. Second or later epochs have statistically insignificant difference.
 * Data:
@@ -27,17 +27,17 @@ Each script has one line to change the number of GPUs.
 
 |						           | 1 GPU   | 2 GPUs  | 8 GPUs    |
 | -------------------- | ------- | ------  | --------- |
-| tensorpack+ResNet50  | 318     |	582	   | __1831__  |
+| tensorpack+ResNet50  | 318     |	582	   | __2177__  |
 | Keras+ResNet50		   | 230     |	291		 |  376      |
 | |
-| tensorpack+VGG16     | 226     |	438	   | __1299__  |
+| tensorpack+VGG16     | 226     |	438	   | __1471__  |
 | Keras+VGG16			     | 188     |	320	   |   501     |
 
 
 
 Notes:
 
-1. With a better (but not equivalent) setting in [../ResNet-MultiGPU/](../ResNet-MultiGPU/),
-	tensorpack can actually reach 2115 im/s for ResNet50 on a p3.16xlarge instance.
+1. With a better (but different in batch sizes, etc) setting in [../ResNet-MultiGPU/](../ResNet-MultiGPU/),
+	tensorpack can further reach 2600 im/s for ResNet50 on a p3.16xlarge instance.
 2. You can train a Keras model in tensorpack to make it faster.
 See [Keras+Tensorpack example](https://github.com/ppwwyyxx/tensorpack/tree/master/examples/keras).

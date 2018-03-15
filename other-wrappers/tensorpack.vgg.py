@@ -73,5 +73,6 @@ if __name__ == '__main__':
         max_epoch=200,
         steps_per_epoch=50,
     )
-    trainer = SyncMultiGPUTrainerReplicated(NUM_GPU)
+    trainer = SyncMultiGPUTrainerReplicated(
+        NUM_GPU, mode='hierarchical' if NUM_GPU == 8 else 'cpu')
     launch_train_with_config(config, trainer)
