@@ -5,12 +5,11 @@ import tensorflow as tf
 from tensorpack import *
 
 class Model(ModelDesc):
-    def _get_inputs(self):
-        return [InputDesc(tf.float32, [None, 32, 32, 3], 'input'),
-                InputDesc(tf.int32, [None], 'label') ]
+    def inputs(self):
+        return [tf.placeholder(tf.float32, [None, 32, 32, 3], 'input'),
+                tf.placeholder(tf.int32, [None], 'label') ]
 
-    def _build_graph(self, inputs):
-        image, label = inputs
+    def build_graph(self, image, label):
         image = tf.transpose(image, [0, 3, 1, 2])
         image = image / 255.0
 
@@ -36,7 +35,7 @@ class Model(ModelDesc):
         tf.reduce_mean(wrong, name='train_error')
         # no weight decay
 
-    def _get_optimizer(self):
+    def optimizer(self):
         lr = tf.get_variable('learning_rate', initializer=1e-4, trainable=False)
         return tf.train.RMSPropOptimizer(lr, epsilon=1e-8)
 

@@ -29,17 +29,16 @@ class Model(ModelDesc):
     def __init__(self, data_format='NCHW'):
         self.data_format = data_format
 
-    def _get_inputs(self):
-        return [InputDesc(IMAGE_DTYPE, [args.batch, INPUT_SHAPE, INPUT_SHAPE, 3], 'input'),
-                InputDesc(tf.int32, [args.batch], 'label')]
+    def inputs(self):
+        return [tf.placeholder(IMAGE_DTYPE, [args.batch, INPUT_SHAPE, INPUT_SHAPE, 3], 'input'),
+                tf.placeholder(tf.int32, [args.batch], 'label')]
 
-    def _get_optimizer(self):
+    def optimizer(self):
         lr = tf.get_variable('learning_rate', initializer=0.1, trainable=False)
         return tf.train.GradientDescentOptimizer(lr)
 
-    def _build_graph(self, inputs):
+    def build_graph(self, image, label):
         ctx = get_current_tower_context()
-        image, label = inputs
 
         # all-zero tensor hurt performance for some reason.
         label = tf.random_uniform(

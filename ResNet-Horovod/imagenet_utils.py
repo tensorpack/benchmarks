@@ -9,7 +9,7 @@ import multiprocessing
 import tensorflow as tf
 from abc import abstractmethod
 
-from tensorpack import imgaug, dataset, ModelDesc, InputDesc
+from tensorpack import imgaug, dataset, ModelDesc
 from tensorpack.dataflow import (
     AugmentImageComponent, PrefetchDataZMQ,
     BatchData, MultiThreadMapData)
@@ -152,12 +152,11 @@ class ImageNetModel(ModelDesc):
     def __init__(self, data_format='NCHW'):
         self.data_format = data_format
 
-    def _get_inputs(self):
-        return [InputDesc(self.image_dtype, [None, self.image_shape, self.image_shape, 3], 'input'),
-                InputDesc(tf.int32, [None], 'label')]
+    def inputs(self):
+        return [tf.placeholder(self.image_dtype, [None, self.image_shape, self.image_shape, 3], 'input'),
+                tf.placeholder(tf.int32, [None], 'label')]
 
-    def _build_graph(self, inputs):
-        image, label = inputs
+    def build_graph(self, image, label):
         image = ImageNetModel.image_preprocess(image, bgr=True)
         if self.data_format == 'NCHW':
             image = tf.transpose(image, [0, 3, 1, 2])
@@ -184,7 +183,7 @@ class ImageNetModel(ModelDesc):
             Nx1000 logits
         """
 
-    def _get_optimizer(self):
+    def optimizer(self):
         """
         Sec 5.1: We use Nesterov momentum with m of 0.9.
         """

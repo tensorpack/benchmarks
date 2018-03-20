@@ -8,12 +8,11 @@ from tensorpack import *
 BATCH = 64
 
 class Model(ModelDesc):
-    def _get_inputs(self):
-        return [InputDesc(tf.float32, [BATCH, 3, 224, 224], 'input'),
-                InputDesc(tf.int32, [BATCH], 'label') ]
+    def inputs(self):
+        return [tf.placeholder(tf.float32, [BATCH, 3, 224, 224], 'input'),
+                tf.placeholder(tf.int32, [BATCH], 'label') ]
 
-    def _build_graph(self, inputs):
-        image, label = inputs
+    def build_graph(self, image, label):
         image = image / 255.0
 
         with argscope(Conv2D, activation=tf.nn.relu, kernel_size=3), \
@@ -38,7 +37,7 @@ class Model(ModelDesc):
         cost = tf.nn.sparse_softmax_cross_entropy_with_logits(logits=logits, labels=label)
         self.cost = tf.reduce_mean(cost, name='cost')
 
-    def _get_optimizer(self):
+    def optimizer(self):
         return tf.train.RMSPropOptimizer(1e-3, epsilon=1e-8)
 
 

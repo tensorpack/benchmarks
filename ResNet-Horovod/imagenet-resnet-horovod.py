@@ -35,14 +35,15 @@ class Model(ImageNetModel):
         with argscope([Conv2D, MaxPooling, GlobalAvgPooling, BatchNorm], data_format='NCHW'):
             return resnet_backbone(image, self.num_blocks, resnet_group, resnet_bottleneck)
 
-    def _build_graph(self, inputs):
+    def build_graph(self, *inputs):
         """
         Sec 3: Remark 3: Normalize the per-worker loss by
         total minibatch size kn, not per-worker size n.
         """
-        super(Model, self)._build_graph(inputs)
+        cost = super(Model, self).build_graph(*inputs)
         if self._loss_scale != 1.0:
-            self.cost = self.cost * self._loss_scale
+            cost = cost * self._loss_scale
+        return cost
 
     # TODO Sec 3: momentum correction
 
