@@ -30,9 +30,12 @@ $ mpirun -np 16 -H host1:8,host2:8 --output-filename test.log \
 
 Notes:
 1. MPI does not like fork(), so running `serve-data.py` inside MPI is not a good idea.
-2. Remove some MPI arguments if running with plain TCP.
+2. To train on small datasets, __you don't need a separate data serving process or zmq__.
+	 You can simply load data inside each training process with its own data loader.
+	 The main motivation to use a separate data loader is to make performance tuning easier.
+3. Remove some MPI arguments if running with plain TCP.
    See https://github.com/uber/horovod/blob/master/docs/benchmarks.md for details.
-	 Performance will be bad.
+	 But performance will be bad.
 
 ```bash
 # Benchmark data speed:
@@ -50,4 +53,4 @@ Validation time excluded from total time. Time depends on your hardware.
 | 128 P100s |	64					  | 1h23min  								|  23.97%   |
 | 256 P100s |	32					  | 1h9min  								|  23.90%   |
 
-Although it does not scale very ideally here, the code does scale with 90+% efficiency on 2 or 4 machines.
+Although it does not scale very ideally with 32 machines, the code does scale with 90+% efficiency on 2 or 4 machines.
