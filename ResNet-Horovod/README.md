@@ -30,7 +30,7 @@ $ mpirun -np 16 -H host1:8,host2:8 --output-filename test.log \
 
 Notes:
 1. MPI does not like fork(), so running `serve-data.py` inside MPI is not a good idea.
-2. To train on small datasets, __you don't need a separate data serving process or zmq__.
+2. To train on small datasets, __you don't need a separate data serving process or zmq ops__.
 	 You can simply load data inside each training process with its own data loader.
 	 The main motivation to use a separate data loader is to make performance tuning easier.
 3. Remove some MPI arguments if running with plain TCP.

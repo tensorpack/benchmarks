@@ -39,5 +39,8 @@ Notes:
 
 1. With a better (but different in batch sizes, etc) setting in [../ResNet-MultiGPU/](../ResNet-MultiGPU/),
 	tensorpack can further reach 2600 im/s for ResNet50 on a p3.16xlarge instance.
-2. You can train a Keras model in tensorpack to make it faster.
-See [Keras+Tensorpack example](https://github.com/ppwwyyxx/tensorpack/tree/master/examples/keras).
+2. It's possible for Keras to be faster (by using better input pipeline, building data-parallel graph by yourself, etc), but it's NOT
+	how most users are using Keras or how any of the Keras examples are written.
+
+	Using Keras together with Tensorpack is one way to make Keras faster.
+	See the [Keras+Tensorpack example](https://github.com/ppwwyyxx/tensorpack/tree/master/examples/keras).
