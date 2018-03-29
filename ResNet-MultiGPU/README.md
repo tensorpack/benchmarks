@@ -59,4 +59,6 @@ Experiments were not run for multiple times. So expect some variance in results.
 | 8					|	1651/1556/1574	  				 |	1604.55								|
 
 ## Latest Best Numbers:
-With TF v1.6.0 and option `--fake-location=gpu --variable-update=replicated`: 1777 image/s on P100s, 2600 image/s on V100s.
+With TF v1.6.0 and option `--fake-location=gpu --variable-update=replicated`:
+	1777 image/s on P100s, 2600 image/s on V100s, 4500 image/s on V100s with fp16,
+	5361 image/s on V100s with fp16 & batch size 128x8.

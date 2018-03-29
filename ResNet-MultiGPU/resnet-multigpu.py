@@ -16,6 +16,7 @@ from tensorpack.utils.gpu import get_nr_gpu
 from tensorpack.tfutils.summary import *
 from tensorpack.tfutils.collection import freeze_collection
 from tensorpack.tfutils import get_current_tower_context
+from tensorpack.tfutils.varreplace import custom_getter_scope
 
 from tfbench.convnet_builder import ConvNetBuilder
 from tfbench import model_config
@@ -52,6 +53,9 @@ class Model(ModelDesc):
             image = tf.transpose(image, [0, 3, 1, 2])
 
         logits = self._get_logits(image)
+        if logits.dtype != tf.float32:
+            logger.info("Casting back to fp32 ...")
+            logits = tf.cast(logits, tf.float32)
 
         loss = tf.nn.sparse_softmax_cross_entropy_with_logits(logits=logits, labels=label)
         loss = tf.reduce_mean(loss, name='xentropy-loss')
@@ -74,16 +78,22 @@ class TFBenchModel(Model):
     def _get_logits(self, image):
         ctx = get_current_tower_context()
 
+        if args.use_fp16:
+            image = tf.cast(image, tf.float16)
         with maybe_freeze_updates(ctx.index > 0):
             network = ConvNetBuilder(
-                image, 3, True, True, data_format=self.data_format,
-                dtype=tf.float32, variable_dtype=tf.float32)
-            dataset = lambda: 1
-            dataset.name = 'imagenet'
-            model_conf = model_config.get_model_config('resnet50', dataset)
-            model_conf.set_batch_size(args.batch)
-            model_conf.add_inference(network)
-            return network.affine(1000, activation='linear', stddev=0.001)
+                image, 3, True,
+                use_tf_layers=True,
+                data_format=self.data_format,
+                dtype=tf.float16 if args.use_fp16 else tf.float32,
+                variable_dtype=tf.float32)
+            with custom_getter_scope(network.get_custom_getter()):
+                dataset = lambda: 1
+                dataset.name = 'imagenet'
+                model_conf = model_config.get_model_config('resnet50', dataset)
+                model_conf.set_batch_size(args.batch)
+                model_conf.add_inference(network)
+                return network.affine(1000, activation='linear', stddev=0.001)
 
 
 class TensorpackModel(Model):
@@ -91,6 +101,7 @@ class TensorpackModel(Model):
     Implement the same model with tensorpack layers.
     """
     def _get_logits(self, image):
+        assert not args.use_fp16
         def shortcut(l, n_in, n_out, stride):
             if n_in != n_out:
                 l = Conv2D('convshortcut', l, n_out, 1, strides=stride)
@@ -188,7 +199,8 @@ if __name__ == '__main__':
     parser.add_argument('--model', choices=['tfbench', 'tensorpack'], default='tfbench')
     parser.add_argument('--load', help='load model')
     parser.add_argument('--prefetch', type=int, default=150)
-    parser.add_argument('--batch', type=int, default=64)
+    parser.add_argument('--use-fp16', action='store_true')
+    parser.add_argument('--batch', type=int, default=64, help='per GPU batch size')
     parser.add_argument('--data_format', help='specify NCHW or NHWC',
                         type=str, default='NCHW')
     parser.add_argument('--fake-location', help='the place to create fake data',
