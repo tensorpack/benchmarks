@@ -16,7 +16,7 @@ from tensorpack.utils.gpu import get_nr_gpu
 import horovod.tensorflow as hvd
 
 from imagenet_utils import (
-    fbresnet_augmentor, get_imagenet_dataflow, ImageNetModel, eval_on_ILSVRC12)
+    fbresnet_augmentor, get_val_dataflow, ImageNetModel, eval_on_ILSVRC12)
 from resnet_model import (
     resnet_group, resnet_bottleneck, resnet_backbone)
 
@@ -78,6 +78,7 @@ def get_config(model, fake=False):
     """
     callbacks = [
         ModelSaver(max_to_keep=100),
+        EstimatedTimeLeft(),
         ScheduledHyperParamSetter(
             'learning_rate', [(30, BASE_LR * 1e-1), (60, BASE_LR * 1e-2),
                               (80, BASE_LR * 1e-3)]),
@@ -97,8 +98,8 @@ def get_config(model, fake=False):
         # TODO For distributed training, you probably don't want everyone to wait for validation.
         # Better to start a separate job, since the model is saved.
         if args.run_validation:
-            dataset_val = get_imagenet_dataflow(
-                args.data, 'val', 64, fbresnet_augmentor(False))  # For reproducibility, do not use remote data for validation
+            dataset_val = get_val_dataflow(
+                args.data, 64, fbresnet_augmentor(False))  # For reproducibility, do not use remote data for validation
             infs = [ClassificationError('wrong-top1', 'val-error-top1'),
                     ClassificationError('wrong-top5', 'val-error-top5')]
             callbacks.append(InferenceRunner(QueueInput(dataset_val), infs))
