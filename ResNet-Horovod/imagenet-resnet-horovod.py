@@ -134,7 +134,7 @@ if __name__ == '__main__':
 
     if args.eval:
         batch = 128    # something that can run on one gpu
-        ds = get_val_data(batch)
+        ds = get_val_dataflow(args.data, batch, fbresnet_augmentor(False))
         model = Model(args.depth)
         eval_on_ILSVRC12(model, get_model_loader(args.load), ds)
     else:
