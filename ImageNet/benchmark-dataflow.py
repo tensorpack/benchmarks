@@ -19,7 +19,6 @@ import augmentors
 def test_orig(dir, name, augs, batch):
     ds = dataset.ILSVRC12(dir, name, shuffle=True)
     ds = PrefetchDataZMQ(ds, 50, hwm=80)
-    return ds
     ds = AugmentImageComponent(ds, augs)
 
     ds = BatchData(ds, batch)

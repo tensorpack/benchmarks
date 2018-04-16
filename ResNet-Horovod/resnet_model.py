@@ -7,9 +7,45 @@ import tensorflow as tf
 
 from tensorpack.tfutils.argscope import argscope, get_arg_scope
 from tensorpack.models import (
-    Conv2D, GlobalAvgPooling, BatchNorm, BNReLU, FullyConnected,
-    LinearWrap)
+    Conv2D, GlobalAvgPooling, BatchNorm, FullyConnected,
+    LinearWrap, layer_register)
 
+
+@layer_register()
+def GroupNorm(x, group=32, gamma_initializer=tf.constant_initializer(1.)):
+    """
+    https://arxiv.org/abs/1803.08494
+    """
+    shape = x.get_shape().as_list()
+    ndims = len(shape)
+    assert ndims in [2, 4]
+    chan = shape[1]
+    assert chan % group == 0, chan
+    group_size = chan // group
+
+    orig_shape = tf.shape(x)
+    h, w = orig_shape[2], orig_shape[3]
+
+    x = tf.reshape(x, tf.stack([-1, group, group_size, h, w]))
+
+    mean, var = tf.nn.moments(x, [2, 3, 4], keep_dims=True)
+
+    new_shape = [1, group, group_size, 1, 1]
+
+    beta = tf.get_variable('beta', [chan], initializer=tf.constant_initializer())
+    beta = tf.reshape(beta, new_shape)
+
+    gamma = tf.get_variable('gamma', [chan], initializer=gamma_initializer)
+    gamma = tf.reshape(gamma, new_shape)
+
+    out = tf.nn.batch_normalization(x, mean, var, beta, gamma, 1e-5, name='output')
+    return tf.reshape(out, orig_shape, name='output')
+
+
+def BNReLU(x, name=None):
+    x = tf.nn.relu(x, name=name)
+    x = GroupNorm('gn', x)
+    return x
 
 def resnet_shortcut(l, n_out, stride, activation=tf.identity):
     n_in = l.get_shape().as_list()[1]
@@ -21,9 +57,9 @@ def resnet_shortcut(l, n_out, stride, activation=tf.identity):
 
 def get_bn(zero_init=False):
     if zero_init:
-        return lambda x, name=None: BatchNorm('bn', x, gamma_initializer=tf.zeros_initializer())
+        return lambda x, name=None: GroupNorm('gn', x, gamma_initializer=tf.zeros_initializer())
     else:
-        return lambda x, name=None: BatchNorm('bn', x)
+        return lambda x, name=None: GroupNorm('gn', x)
 
 
 def resnet_bottleneck(l, ch_out, stride, stride_first=False):
@@ -61,9 +97,7 @@ def resnet_backbone(image, num_blocks, group_func, block_func):
     with argscope(Conv2D, use_bias=False,
                   kernel_initializer=tf.variance_scaling_initializer(scale=2.0, mode='fan_out')):
         logits = (LinearWrap(image)
-                  .Conv2D('conv0', 64, 7, strides=2)
-                  .BatchNorm('bn0')
-                  .tf.nn.relu()
+                  .Conv2D('conv0', 64, 7, strides=2, nl=BNReLU)
                   .MaxPooling('pool0', 3, strides=2, padding='SAME')
                   .apply(group_func, 'group0', block_func, 64, num_blocks[0], 1)
                   .apply(group_func, 'group1', block_func, 128, num_blocks[1], 2)

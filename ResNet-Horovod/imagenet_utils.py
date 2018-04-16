@@ -12,11 +12,12 @@ from abc import abstractmethod
 from tensorpack import imgaug, dataset, ModelDesc
 from tensorpack.dataflow import (
     AugmentImageComponent, PrefetchDataZMQ,
-    BatchData, MultiThreadMapData)
+    BatchData, MultiThreadMapData, DataFromList)
 from tensorpack.predict import PredictConfig, SimpleDatasetPredictor
 from tensorpack.utils.stats import RatioCounter
 from tensorpack.models import regularize_cost
 from tensorpack.tfutils.summary import add_moving_summary
+from tensorpack.utils import logger
 
 
 class GoogleNetResize(imgaug.ImageAugmentor):
@@ -105,13 +106,27 @@ def fbresnet_augmentor(isTrain):
 
 def get_val_dataflow(
         datadir, batch_size,
-        augmentors, parallel=None):
+        augmentors, parallel=None,
+        num_splits=None, split_index=None):
     assert datadir is not None
     assert isinstance(augmentors, list)
     if parallel is None:
         parallel = min(40, multiprocessing.cpu_count())
 
-    ds = dataset.ILSVRC12Files(datadir, 'val', shuffle=False)
+    if num_splits is None:
+        ds = dataset.ILSVRC12Files(datadir, 'val', shuffle=False)
+    else:
+        assert split_index < num_splits
+        files = dataset.ILSVRC12Files(datadir, 'val', shuffle=False)
+        files.reset_state()
+        files = list(files.get_data())
+        logger.info("#ValidationData = {}".format(len(files)))
+        split_size = len(files) // num_splits
+        start, end = split_size * split_index, split_size * (split_index + 1)
+        end = min(end, len(files))
+        logger.info("#ValidationSplit = {} - {}".format(start, end))
+        files = files[start: end]
+        ds = DataFromList(files, shuffle=False)
     aug = imgaug.AugmentorList(augmentors)
 
     def mapf(dp):
@@ -146,12 +161,6 @@ def eval_on_ILSVRC12(model, sessinit, dataflow):
 class ImageNetModel(ModelDesc):
     weight_decay = 1e-4
     image_shape = 224
-
-    """
-    uint8 instead of float32 is used as input type to reduce copy overhead.
-    It might hurt the performance a liiiitle bit.
-    The pretrained models were trained with float32.
-    """
     image_dtype = tf.uint8
 
     def __init__(self, data_format='NCHW'):

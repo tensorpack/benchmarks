@@ -8,7 +8,7 @@ from tensorpack.dataflow import imgaug
 
 
 __all__ = ['fbresnet_augmentor', 'inference_augmentor',
-           'resizeAndPCA_augmentor']
+           'resizeAndLighting_augmentor']
 
 
 class GoogleNetResize(imgaug.ImageAugmentor):
@@ -72,7 +72,7 @@ def fbresnet_augmentor():
     return augmentors
 
 
-def resizeAndPCA_augmentor():
+def resizeAndLighting_augmentor():
     # assme BGR input
     augmentors = [
         GoogleNetResize(),

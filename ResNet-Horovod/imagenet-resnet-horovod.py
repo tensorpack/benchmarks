@@ -9,6 +9,7 @@ import numpy as np
 import multiprocessing as mp
 import cv2
 
+import tensorflow as tf
 from tensorpack import *
 from tensorpack.tfutils import argscope, get_model_loader
 from tensorpack.utils.gpu import get_nr_gpu
@@ -45,7 +46,22 @@ class Model(ImageNetModel):
             cost = cost * self._loss_scale
         return cost
 
-    # TODO Sec 3: momentum correction
+    # Sec 3: momentum correction
+    # Tensorflow's momentum optimizer does not need correction.
+
+
+class HorovodClassificationError(ClassificationError):
+    def _setup_graph(self):
+        self._placeholder = tf.placeholder(tf.float32, shape=[2], name='to_be_reduced')
+        self._reduced = hvd.allreduce(self._placeholder, average=False)
+
+    def _after_inference(self):
+        tot = self.err_stat.total
+        cnt = self.err_stat.count
+        print("Before: ", tot, cnt)
+        tot, cnt = self._reduced.eval(feed_dict={self._placeholder: [tot, cnt]})
+        print("After: ", tot, cnt)
+        return {self.summary_name: cnt * 1. / tot}
 
 
 def get_config(model, fake=False):
@@ -94,15 +110,24 @@ def get_config(model, fake=False):
                 'learning_rate', [(0, 0.1), (5 * steps_per_epoch, BASE_LR)],
                 interp='linear', step_based=True))
 
-    if hvd.rank() == 0 and not args.fake:
-        # TODO For distributed training, you probably don't want everyone to wait for validation.
-        # Better to start a separate job, since the model is saved.
-        if args.run_validation:
+    # TODO For distributed training, you probably don't want everyone to wait for validation.
+    # Better to start a separate job, since the model is saved.
+    if args.validation is not None:
+        if args.validation == 'master' and hvd.rank() == 0:
+            # For reproducibility, do not use remote data for validation
             dataset_val = get_val_dataflow(
-                args.data, 64, fbresnet_augmentor(False))  # For reproducibility, do not use remote data for validation
+                args.data, 64, fbresnet_augmentor(False))
             infs = [ClassificationError('wrong-top1', 'val-error-top1'),
                     ClassificationError('wrong-top5', 'val-error-top5')]
             callbacks.append(InferenceRunner(QueueInput(dataset_val), infs))
+        elif args.validation == 'distributed':
+            dataset_val = get_val_dataflow(
+                args.data, 64, fbresnet_augmentor(False),
+                num_splits=hvd.size(), split_index=hvd.rank())  # For reproducibility, do not use remote data for validation
+            infs = [HorovodClassificationError('wrong-top1', 'val-error-top1'),
+                    HorovodClassificationError('wrong-top5', 'val-error-top5')]
+            callbacks.append(
+                InferenceRunner(QueueInput(dataset_val), infs).set_chief_only(False))
 
     return TrainConfig(
         model=model,
@@ -122,7 +147,7 @@ if __name__ == '__main__':
     parser.add_argument('-d', '--depth', help='resnet depth',
                         type=int, default=50, choices=[50, 101, 152])
     parser.add_argument('--eval', action='store_true', help='run evaluation with --load instead of training.')
-    parser.add_argument('--run-validation', action='store_true', help='run validation every epoch on the chief process. will be slow.')
+    parser.add_argument('--validation', choices=['distributed', 'master'])
     """
     Sec 2.3: We keep the per-worker sample size n constant when we change the number of workers k.
     In this work, we use n = 32 which has performed well for a wide range of datasets and networks.
