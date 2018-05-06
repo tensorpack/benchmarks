@@ -57,7 +57,7 @@ def fbresnet_augmentor():
             [imgaug.BrightnessScale((0.6, 1.4), clip=False),
              imgaug.Contrast((0.6, 1.4), clip=False),
              imgaug.Saturation(0.4, rgb=False),
-             # rgb-bgr conversion for the constants copied from fb.resnet.torch
+             # rgb->bgr conversion for the constants copied from fb.resnet.torch
              imgaug.Lighting(0.1,
                              eigval=np.asarray(
                                  [0.2175, 0.0188, 0.0045][::-1]) * 255.0,

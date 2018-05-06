@@ -30,7 +30,7 @@ if __name__ == '__main__':
     parser.add_argument('data', help='directory to imagenet')
     parser.add_argument('--name', choices=['train', 'val'], default='train')
     parser.add_argument('--batch', type=int, default=128)
-    parser.add_argument('--parallel', type=int, default=60)
+    parser.add_argument('--parallel', type=int, default=40)
     args = parser.parse_args()
 
     imglist = get_imglist(args.data, args.name)
