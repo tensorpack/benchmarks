@@ -42,21 +42,21 @@ Experiments were not run for multiple times. So expect some variance in results.
 
 `variable-update=replicated`:
 
-| #GPU			| tensorpack(GPU/CPU/Python) | tensorflow/benchmarks |
-| --------- | ----------------------	| --------------------  |
-| 1         |	228/228/219							| 225.73								|
-| 2					|	427/423/415   				  | 424.54								|
-| 4					| 802/785/787							|	789.51								|
-| 8					|	1612/1579/1551					|	1580.58								|
+| #GPU      | tensorpack(GPU/CPU/Python) | tensorflow/benchmarks |
+| --------- | ----------------------     | --------------------  |
+| 1         | 228/228/219                | 225.73                |
+| 2         | 427/423/415                | 424.54                |
+| 4         | 802/785/787                | 789.51                |
+| 8         | 1612/1579/1551             | 1580.58               |
 
 `variable-update=parameter_server`:
 
-| #GPU			| tensorpack(GPU/CPU/Python) | tensorflow/benchmarks  |
-| --------- | -------------------				 | --------------------   |
-| 1         |	227/227/223								 |  221.68								|
-| 2					|	428/418/403								 |  421.01								|
-| 4					|	817/802/787								 |	828.29								|
-| 8					|	1651/1556/1574	  				 |	1604.55								|
+| #GPU      | tensorpack(GPU/CPU/Python) | tensorflow/benchmarks |
+| --------- | -------------------        | --------------------  |
+| 1         | 227/227/223                | 221.68                |
+| 2         | 428/418/403                | 421.01                |
+| 4         | 817/802/787                | 828.29                |
+| 8         | 1651/1556/1574             | 1604.55               |
 
 ## Latest Best Numbers:
 With TF v1.6.0 and option `--fake-location=gpu --variable-update=replicated`:

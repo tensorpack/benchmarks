@@ -47,10 +47,10 @@ $ ./serve-data.py --data ~/data/imagenet/ --batch 64 --benchmark
 
 Validation time excluded from total time. Time depends on your hardware.
 
- |devices   | batch per GPU | time    | top1 err |
-|   -       |    -          |    -										|   -      |
-| 128 P100s |	32					  | 1h40min  								|  23.62%   |
-| 128 P100s |	64					  | 1h23min  								|  23.97%   |
-| 256 P100s |	32					  | 1h9min  								|  23.90%   |
+ | devices   | batch per GPU | time    | top1 err |
+ | -         | -             | -       | -        |
+ | 128 P100s | 32            | 1h40min | 23.62%   |
+ | 128 P100s | 64            | 1h23min | 23.97%   |
+ | 256 P100s | 32            | 1h9min  | 23.90%   |
 
 Although it does not scale very ideally with 32 machines, the code does scale with 90+% efficiency on 2 or 4 machines.
