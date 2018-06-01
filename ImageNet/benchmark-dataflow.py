@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-# File: benchmark-ImageNet.py
+# File: benchmark-dataflow.py
 
 import argparse
 import cv2
@@ -17,7 +17,6 @@ import augmentors
 
 def test_orig(dir, name, augs, batch):
     ds = dataset.ILSVRC12(dir, name, shuffle=True)
-    ds = PrefetchDataZMQ(ds, 50, hwm=80)
     ds = AugmentImageComponent(ds, augs)
 
     ds = BatchData(ds, batch)
@@ -30,6 +29,7 @@ def test_lmdb_train(db, augs, batch):
     ds = LMDBData(db, shuffle=False)
     ds = LocallyShuffleData(ds, 50000)
     ds = PrefetchData(ds, 5000, 1)
+    return ds
 
     ds = LMDBDataPoint(ds)
 
