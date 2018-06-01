@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 # File: benchmark-ImageNet.py
-# Author: Yuxin Wu <ppwwyyxxc@gmail.com>
 
 import argparse
 import cv2

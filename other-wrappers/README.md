@@ -43,4 +43,4 @@ Notes:
 	how most users are using Keras or how any of the Keras examples are written.
 
 	Using Keras together with Tensorpack is one way to make Keras faster.
-	See the [Keras+Tensorpack example](https://github.com/ppwwyyxx/tensorpack/tree/master/examples/keras).
+	See the [Keras+Tensorpack example](https://github.com/tensorpack/tensorpack/tree/master/examples/keras).

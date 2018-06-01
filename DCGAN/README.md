@@ -10,7 +10,7 @@ python main.py --dataset celebA --train --crop
 ```
 This command takes 0.36s per iteration, where each iteration is 1 update to D and 2 updates to G.
 
-* [tensorpack DCGAN examples](https://github.com/ppwwyyxx/tensorpack/blob/master/examples/GAN/DCGAN.py):
+* [tensorpack DCGAN examples](https://github.com/tensorpack/tensorpack/blob/master/examples/GAN/DCGAN.py):
 
 Modify the code to use `SeparateGANTrainer(..., d_period=2)`, and run with:
 ```
