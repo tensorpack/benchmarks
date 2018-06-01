@@ -201,6 +201,9 @@ class ImageNetModel(ModelDesc):
     def optimizer(self):
         """
         Sec 5.1: We use Nesterov momentum with m of 0.9.
+
+        Sec 3: momentum correction
+        Tensorflow's momentum optimizer does not need correction.
         """
         lr = tf.get_variable('learning_rate', initializer=0.1, trainable=False)
         tf.summary.scalar('learning_rate-summary', lr)

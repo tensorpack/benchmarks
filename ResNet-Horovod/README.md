@@ -1,24 +1,26 @@
 
 # Tensorpack + Horovod
 
-Multi-GPU / distributed training on ImageNet.
+Multi-GPU / distributed training on ImageNet, with TensorFlow + Tensorpack + Horovod.
 
-It follows most settings in the paper
+It reproduces the settings in the paper
 + [Accurate, Large Minibatch SGD: Training ImageNet in 1 Hour](https://arxiv.org/abs/1706.02677)
+
+The code is annotated with sentences from the paper.
 
 ## Usage:
 
-Install TF>=1.5, tensorpack>=0.8.1, [Horovod](https://github.com/uber/horovod), [zmq_ops](https://github.com/tensorpack/zmq_ops).
-Prepare ImageNet data into [this structure](http://tensorpack.readthedocs.io/en/latest/modules/dataflow.dataset.html#tensorpack.dataflow.dataset.ILSVRC12).
+Install TensorFlow>=1.5, tensorpack>=0.8.1, [Horovod](https://github.com/uber/horovod), [zmq_ops](https://github.com/tensorpack/zmq_ops).
+Prepare ImageNet data into [this structure](http://tensorpack.readthedocs.io/modules/dataflow.dataset.html#tensorpack.dataflow.dataset.ILSVRC12).
 
 ```bash
-# Single Machine:
+# Single Machine, Multiple GPU:
 $ ./serve-data.py --data ~/data/imagenet/ --batch 64
 $ mpirun -np 8 --output-filename test.log python3 ./imagenet-resnet-horovod.py -d 50 --data ~/data/imagenet/ --batch 64
 ```
 
 ```bash
-# Multiple machines with RoCE/IB:
+# Multiple Machines with RoCE/IB:
 host1$ ./serve-data.py --data ~/data/imagenet/ --batch 64
 host2$ ./serve-data.py --data ~/data/imagenet/ --batch 64
 $ mpirun -np 16 -H host1:8,host2:8 --output-filename test.log \
@@ -35,7 +37,7 @@ Notes:
 	 The main motivation to use a separate data loader is to make performance tuning easier.
 3. Remove some MPI arguments if running with plain TCP.
    See https://github.com/uber/horovod/blob/master/docs/benchmarks.md for details.
-	 But performance will be bad.
+   It will then have much worse scaling efficiency.
 
 ```bash
 # Benchmark data speed:

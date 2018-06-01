@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-# -*- coding: UTF-8 -*-
+# -*- coding: utf-8 -*-
 # File: imagenet-resnet-horovod.py
 
 import argparse
@@ -46,9 +46,6 @@ class Model(ImageNetModel):
             cost = cost * self._loss_scale
         return cost
 
-    # Sec 3: momentum correction
-    # Tensorflow's momentum optimizer does not need correction.
-
 
 class HorovodClassificationError(ClassificationError):
     def _setup_graph(self):
@@ -58,9 +55,7 @@ class HorovodClassificationError(ClassificationError):
     def _after_inference(self):
         tot = self.err_stat.total
         cnt = self.err_stat.count
-        print("Before: ", tot, cnt)
         tot, cnt = self._reduced.eval(feed_dict={self._placeholder: [tot, cnt]})
-        print("After: ", tot, cnt)
         return {self.summary_name: cnt * 1. / tot}
 
 
