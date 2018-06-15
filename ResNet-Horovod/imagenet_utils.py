@@ -163,22 +163,22 @@ class ImageNetModel(ModelDesc):
     image_shape = 224
     image_dtype = tf.uint8
 
-    def __init__(self, data_format='NCHW'):
-        self.data_format = data_format
-
     def inputs(self):
         return [tf.placeholder(self.image_dtype, [None, self.image_shape, self.image_shape, 3], 'input'),
                 tf.placeholder(tf.int32, [None], 'label')]
 
     def build_graph(self, image, label):
         image = ImageNetModel.image_preprocess(image, bgr=True)
-        if self.data_format == 'NCHW':
-            image = tf.transpose(image, [0, 3, 1, 2])
+        image = tf.transpose(image, [0, 3, 1, 2])
 
         logits = self.get_logits(image)
         loss = ImageNetModel.compute_loss_and_error(logits, label)
 
         if self.weight_decay > 0:
+            """
+            Sec 5.1: We use a weight decay λ of 0.0001 and following [16] we do not apply
+            weight decay on the learnable BN coefficients
+            """
             wd_loss = regularize_cost('.*/W', tf.contrib.layers.l2_regularizer(self.weight_decay),
                                       name='l2_regularize_loss')
             add_moving_summary(loss, wd_loss)

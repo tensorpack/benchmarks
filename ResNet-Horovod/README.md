@@ -15,7 +15,8 @@ The code is annotated with sentences from the paper.
 
 ## Run:
 ```bash
-# Single Machine, Multiple GPU:
+# Single Machine, Multiple GPUs:
+# Run the following two commands together:
 $ ./serve-data.py --data ~/data/imagenet/ --batch 64
 $ mpirun -np 8 --output-filename test.log python3 ./imagenet-resnet-horovod.py -d 50 --data ~/data/imagenet/ --batch 64
 ```
@@ -43,6 +44,7 @@ Notes:
    It will then have much worse scaling efficiency.
 4. You can pass `--no-zmq-ops` to both scripts, to use Python for
    communication instead of the faster zmq_ops.
+5. If you're using slurm in a cluster, checkout an example [sbatch script](slurm.script).
 
 ## Performance Benchmark:
 ```bash
@@ -54,12 +56,17 @@ $ ./serve-data.py --data ~/data/imagenet/ --batch 64 --benchmark
 
 ## Distributed ResNet50 Results:
 
-Validation time excluded from total time. Time depends on your hardware.
-
  | devices   | batch per GPU | time    | top1 err |
  | -         | -             | -       | -        |
+ | 32 P100s  | 64            | 5h9min  | 23.73%   |
  | 128 P100s | 32            | 1h40min | 23.62%   |
  | 128 P100s | 64            | 1h23min | 23.97%   |
  | 256 P100s | 32            | 1h9min  | 23.90%   |
 
-Although it does not scale very ideally with 32 machines, the code does scale with 90+% efficiency on 2 or 4 machines.
+
+Notes:
+1. Validation time excluded from total time. Time depends on your hardware.
+
+2. Although it does not scale very ideally with 32 machines, the code does scale with 90+% efficiency on 2 or 4 machines.
+
+3. The final error typically has ±0.1 or more fluctuation according to the paper.

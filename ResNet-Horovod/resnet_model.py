@@ -26,9 +26,6 @@ def get_bn(zero_init=False):
 
 
 def resnet_bottleneck(l, ch_out, stride, stride_first=False):
-    """
-    stride_first: original resnet put stride on first conv. fb.resnet.torch put stride on second conv.
-    """
     shortcut = l
     l = Conv2D('conv1', l, ch_out, 1, strides=stride if stride_first else 1, activation=BNReLU)
     """
@@ -45,7 +42,7 @@ def resnet_bottleneck(l, ch_out, stride, stride_first=False):
     """
     l = Conv2D('conv3', l, ch_out * 4, 1, activation=get_bn(zero_init=True))
     ret = l + resnet_shortcut(shortcut, ch_out * 4, stride, activation=get_bn(zero_init=False))
-    return tf.nn.relu(ret)
+    return tf.nn.relu(ret, name='block_output')
 
 
 def resnet_group(name, l, block_func, features, count, stride):
@@ -57,6 +54,10 @@ def resnet_group(name, l, block_func, features, count, stride):
 
 
 def resnet_backbone(image, num_blocks, group_func, block_func):
+    """
+    Sec 5.1: We adopt the initialization of [15] for all convolutional layers.
+    TensorFlow does not have the true "MSRA init". We use variance_scaling as an approximation.
+    """
     with argscope(Conv2D, use_bias=False,
                   kernel_initializer=tf.variance_scaling_initializer(scale=2.0, mode='fan_out')):
         l = Conv2D('conv0', image, 64, 7, strides=2, activation=BNReLU)

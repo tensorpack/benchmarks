@@ -18,6 +18,11 @@ from zmq_ops import dump_arrays
 
 
 def get_data(batch, augmentors):
+    """
+    Sec 3, Remark 4:
+    Use a single random shuffling of the training data (per epoch) that is divided amongst all k workers.
+    Here we do not follow the paper because it does not seem to make a difference.
+    """
     ds = dataset.ILSVRC12(args.data, 'train', shuffle=True)
     ds = AugmentImageComponent(ds, augmentors, copy=False)
     ds = BatchData(ds, batch, remainder=False)

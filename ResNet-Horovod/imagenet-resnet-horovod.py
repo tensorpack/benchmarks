@@ -22,7 +22,6 @@ from resnet_model import (
 
 class Model(ImageNetModel):
     def __init__(self, depth, loss_scale=1.0):
-        super(Model, self).__init__('NCHW')
         self._loss_scale = loss_scale
         self.num_blocks = {
             50: [3, 4, 6, 3],
@@ -46,6 +45,10 @@ class Model(ImageNetModel):
 
 
 class HorovodClassificationError(ClassificationError):
+    """
+    Like ClassificationError, it evaluates total samples & count of wrong samples.
+    But in the end we aggregate the total&count by horovod.
+    """
     def _setup_graph(self):
         self._placeholder = tf.placeholder(tf.float32, shape=[2], name='to_be_reduced')
         self._reduced = hvd.allreduce(self._placeholder, average=False)
@@ -140,14 +143,15 @@ def get_config(model, fake=False):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--data', help='ILSVRC dataset dir')
-    parser.add_argument('--logdir', default='train_log/tmp')
+    parser.add_argument('--logdir', help='Directory for models and training stats.')
     parser.add_argument('--load', help='load model')
+    parser.add_argument('--eval', action='store_true', help='run evaluation with --load instead of training.')
+
     parser.add_argument('--fake', help='use fakedata to test or benchmark this model', action='store_true')
     parser.add_argument('-d', '--depth', help='resnet depth',
                         type=int, default=50, choices=[50, 101, 152])
-    parser.add_argument('--eval', action='store_true', help='run evaluation with --load instead of training.')
     parser.add_argument('--validation', choices=['distributed', 'master'],
-                        help='Validation method. By default it does no validation.')
+                        help='Validation method. By default the script performs no validation.')
     parser.add_argument('--no-zmq-ops', help='use pure python to send/receive data',
                         action='store_true')
     """
@@ -167,9 +171,13 @@ if __name__ == '__main__':
     logger.info("Training on {}".format(socket.gethostname()))
     # Print some information for sanity check.
     os.system("nvidia-smi")
-
     assert args.load is None
+
     hvd.init()
+
+    if args.logdir is None:
+        args.logdir = os.path.join('train_log', 'Horovod-{}GPUs-{}Batch'.format(hvd.size(), args.batch))
+
     if hvd.rank() == 0:
         logger.set_logger_dir(args.logdir, 'd')
     logger.info("Rank={}, Local Rank={}, Size={}".format(hvd.rank(), hvd.local_rank(), hvd.size()))
