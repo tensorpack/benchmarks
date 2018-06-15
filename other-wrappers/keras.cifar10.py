@@ -7,11 +7,9 @@ It gets to 75% validation accuracy in 25 epochs, and 79% after 50 epochs.
 from __future__ import print_function
 import keras
 from keras.datasets import cifar10
-from keras.preprocessing.image import ImageDataGenerator
 from keras.models import Sequential
 from keras.layers import Dense, Dropout, Activation, Flatten
 from keras.layers import Conv2D, MaxPooling2D
-import os
 
 batch_size = 32
 num_classes = 10
@@ -67,5 +65,5 @@ print('Not using data augmentation.')
 model.fit(x_train, y_train,
           batch_size=batch_size,
           epochs=epochs,
-          #validation_data=(x_test, y_test),
+          # validation_data=(x_test, y_test),
           shuffle=True)

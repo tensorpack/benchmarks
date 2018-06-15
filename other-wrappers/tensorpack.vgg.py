@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-# -*- coding: UTF-8 -*-
+# -*- coding: utf-8 -*-
 # File: tensorpack.vgg.py
 import tensorflow as tf
 import numpy as np
@@ -8,10 +8,11 @@ from tensorpack import *
 BATCH = 64  # tensorpack's "batch" is per-GPU batch.
 NUM_GPU = 1
 
+
 class Model(ModelDesc):
     def inputs(self):
         return [tf.placeholder(tf.float32, [None, 3, 224, 224], 'input'),
-                tf.placeholder(tf.int32, [None], 'label') ]
+                tf.placeholder(tf.int32, [None], 'label')]
 
     def build_graph(self, image, label):
         image = image / 255.0
@@ -56,6 +57,7 @@ class Model(ModelDesc):
 def get_data():
     X_train = np.random.random((BATCH, 3, 224, 224)).astype('float32')
     Y_train = np.random.random((BATCH,)).astype('int32')
+
     def gen():
         while True:
             yield [X_train, Y_train]

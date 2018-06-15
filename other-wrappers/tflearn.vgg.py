@@ -4,7 +4,7 @@
 from __future__ import division, print_function, absolute_import
 
 import tflearn
-from tflearn.data_utils import shuffle, to_categorical
+from tflearn.data_utils import to_categorical
 from tflearn.layers.core import input_data, dropout, fully_connected
 import numpy as np
 from tflearn.layers.conv import conv_2d, max_pool_2d

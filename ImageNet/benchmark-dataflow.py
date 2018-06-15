@@ -4,26 +4,26 @@
 
 import argparse
 import cv2
-import numpy as np
-import os
 
 from tensorpack import *
 from tensorpack.dataflow.imgaug import *
-from tensorpack.dataflow.parallel import PlasmaGetData, PlasmaPutData
+from tensorpack.dataflow.parallel import PlasmaGetData, PlasmaPutData  # noqa
 from tensorpack.utils.serialize import loads
 from tensorpack.dataflow.dftools import *
 
 import augmentors
+
 
 def test_orig(dir, name, augs, batch):
     ds = dataset.ILSVRC12(dir, name, shuffle=True)
     ds = AugmentImageComponent(ds, augs)
 
     ds = BatchData(ds, batch)
-    #ds = PlasmaPutData(ds)
+    # ds = PlasmaPutData(ds)
     ds = PrefetchDataZMQ(ds, 50, hwm=80)
-    #ds = PlasmaGetData(ds)
+    # ds = PlasmaGetData(ds)
     return ds
+
 
 def test_lmdb_train(db, augs, batch):
     ds = LMDBData(db, shuffle=False)
@@ -39,16 +39,18 @@ def test_lmdb_train(db, augs, batch):
     ds = AugmentImageComponent(ds, augs)
 
     ds = BatchData(ds, batch, use_list=True)
-    #ds = PlasmaPutData(ds)
+    # ds = PlasmaPutData(ds)
     ds = PrefetchDataZMQ(ds, 40, hwm=80)
-    #ds = PlasmaGetData(ds)
+    # ds = PlasmaGetData(ds)
     return ds
+
 
 def test_lmdb_inference(db, augs, batch):
     ds = LMDBData(db, shuffle=False)
     # ds = LocallyShuffleData(ds, 50000)
 
     augs = AugmentorList(augs)
+
     def mapper(data):
         im, label = loads(data[1])
         im = cv2.imdecode(im, cv2.IMREAD_COLOR)
@@ -56,9 +58,8 @@ def test_lmdb_inference(db, augs, batch):
         return im, label
 
     ds = MultiProcessMapData(ds, 40, mapper,
-            buffer_size=200)
-    #ds = MultiThreadMapData(ds, 40, mapper,
-            #buffer_size=2000)
+                             buffer_size=200)
+    # ds = MultiThreadMapData(ds, 40, mapper, buffer_size=2000)
 
     ds = BatchData(ds, batch)
     ds = PrefetchDataZMQ(ds, 1)
@@ -69,6 +70,7 @@ def test_inference(dir, name, augs, batch=128):
     ds = dataset.ILSVRC12Files(dir, name, shuffle=False, dir_structure='train')
 
     aug = imgaug.AugmentorList(augs)
+
     def mapf(dp):
         fname, cls = dp
         im = cv2.imread(fname, cv2.IMREAD_COLOR)

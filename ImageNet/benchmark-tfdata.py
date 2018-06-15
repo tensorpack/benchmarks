@@ -2,8 +2,6 @@
 # -*- coding: utf-8 -*-
 # File: benchmark-tfdata.py
 
-import os
-import numpy as np
 import tqdm
 import argparse
 import tensorflow as tf

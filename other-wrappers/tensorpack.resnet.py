@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-# -*- coding: UTF-8 -*-
+# -*- coding: utf-8 -*-
 # File: tensorpack.resnet.py
 import tensorflow as tf
 import numpy as np
@@ -8,12 +8,14 @@ from tensorpack import *
 BATCH = 32  # tensorpack's "batch" is per-GPU batch.
 NUM_GPU = 1
 
+
 def resnet_shortcut(l, n_out, stride, activation=tf.identity):
     n_in = l.get_shape().as_list()[1]
     if n_in != n_out:   # change dimension when channel is not the same
         return Conv2D('convshortcut', l, n_out, 1, strides=stride, activation=activation)
     else:
         return l
+
 
 def block_func(l, ch_out, stride):
     BN = lambda x, name=None: BatchNorm('bn', x)
@@ -35,7 +37,7 @@ def group_func(l, name, block_func, features, count, stride):
 class Model(ModelDesc):
     def inputs(self):
         return [tf.placeholder(tf.float32, [None, 3, 224, 224], 'input'),
-                tf.placeholder(tf.int32, [None], 'label') ]
+                tf.placeholder(tf.int32, [None], 'label')]
 
     def build_graph(self, image, label):
         image = image / 255.0
@@ -64,10 +66,12 @@ class Model(ModelDesc):
 def get_data():
     X_train = np.random.random((BATCH, 3, 224, 224)).astype('float32')
     Y_train = np.random.random((BATCH,)).astype('int32')
+
     def gen():
         while True:
             yield [X_train, Y_train]
     return DataFromGenerator(gen)
+
 
 if __name__ == '__main__':
     dataset_train = get_data()

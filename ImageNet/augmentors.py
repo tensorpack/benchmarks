@@ -45,7 +45,7 @@ class GoogleNetResize(imgaug.ImageAugmentor):
 def inference_augmentor():
     return [
         imgaug.ResizeShortestEdge(256, cv2.INTER_CUBIC),
-        imgaug.CenterCrop((224,224))
+        imgaug.CenterCrop((224, 224))
     ]
 
 
@@ -76,14 +76,14 @@ def resizeAndLighting_augmentor():
     # assme BGR input
     augmentors = [
         GoogleNetResize(),
-         imgaug.Lighting(0.1,
-                         eigval=np.asarray(
-                             [0.2175, 0.0188, 0.0045][::-1]) * 255.0,
-                         eigvec=np.array(
-                             [[-0.5675, 0.7192, 0.4009],
-                              [-0.5808, -0.0045, -0.8140],
-                              [-0.5836, -0.6948, 0.4203]],
-                             dtype='float32')[::-1, ::-1]),
+        imgaug.Lighting(0.1,
+                        eigval=np.asarray(
+                            [0.2175, 0.0188, 0.0045][::-1]) * 255.0,
+                        eigvec=np.array(
+                            [[-0.5675, 0.7192, 0.4009],
+                             [-0.5808, -0.0045, -0.8140],
+                             [-0.5836, -0.6948, 0.4203]],
+                            dtype='float32')[::-1, ::-1]),
         imgaug.Flip(horiz=True),
     ]
     return augmentors
@@ -93,14 +93,14 @@ def resizeOnly_augmentor():
     # assme BGR input
     augmentors = [
         GoogleNetResize(),
-         imgaug.Lighting(0.1,
-                         eigval=np.asarray(
-                             [0.2175, 0.0188, 0.0045][::-1]) * 255.0,
-                         eigvec=np.array(
-                             [[-0.5675, 0.7192, 0.4009],
-                              [-0.5808, -0.0045, -0.8140],
-                              [-0.5836, -0.6948, 0.4203]],
-                             dtype='float32')[::-1, ::-1]),
+        imgaug.Lighting(0.1,
+                        eigval=np.asarray(
+                            [0.2175, 0.0188, 0.0045][::-1]) * 255.0,
+                        eigvec=np.array(
+                            [[-0.5675, 0.7192, 0.4009],
+                             [-0.5808, -0.0045, -0.8140],
+                             [-0.5836, -0.6948, 0.4203]],
+                            dtype='float32')[::-1, ::-1]),
         imgaug.Flip(horiz=True),
     ]
     return augmentors

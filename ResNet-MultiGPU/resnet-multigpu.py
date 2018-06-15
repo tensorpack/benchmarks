@@ -1,17 +1,15 @@
 #!/usr/bin/env python
-# -*- coding: UTF-8 -*-
+# -*- coding: utf-8 -*-
 # File: resnet-multigpu.py
 
 import sys
 import argparse
-import numpy as np
 import os
 from contextlib import contextmanager
 import tensorflow as tf
 
 from tensorpack import *
 from tensorflow.contrib.layers import variance_scaling_initializer
-from tensorpack.utils.stats import RatioCounter
 from tensorpack.utils.gpu import get_nr_gpu
 from tensorpack.tfutils.summary import *
 from tensorpack.tfutils.collection import freeze_collection
@@ -39,8 +37,6 @@ class Model(ModelDesc):
         return tf.train.GradientDescentOptimizer(lr)
 
     def build_graph(self, image, label):
-        ctx = get_current_tower_context()
-
         # all-zero tensor hurt performance for some reason.
         label = tf.random_uniform(
             [args.batch],
@@ -66,6 +62,7 @@ class Model(ModelDesc):
             wd_cost = regularize_cost('.*', tf.nn.l2_loss) * 1e-4
             self.cost = tf.add_n([loss, wd_cost], name='cost')
 
+
 @contextmanager
 def maybe_freeze_updates(enable):
     if enable:
@@ -73,6 +70,7 @@ def maybe_freeze_updates(enable):
             yield
     else:
         yield
+
 
 class TFBenchModel(Model):
     def _get_logits(self, image):
@@ -102,6 +100,7 @@ class TensorpackModel(Model):
     """
     def _get_logits(self, image):
         assert not args.use_fp16
+
         def shortcut(l, n_in, n_out, stride):
             if n_in != n_out:
                 l = Conv2D('convshortcut', l, n_out, 1, strides=stride)
@@ -193,6 +192,7 @@ def get_data(mode):
             'ipc://testpipe', hwm=args.prefetch)
         return StagingInput(ret, nr_stage=1)
 
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--gpu', help='comma separated list of GPU(s) to use.')
@@ -252,7 +252,7 @@ if __name__ == '__main__':
             trainer = {
                 'replicated': lambda: SyncMultiGPUTrainerReplicated(
                     NR_GPU, average=False, mode='hierarchical' if NR_GPU >= 8 else 'cpu'),
-                    # average=False is the actual configuration used by tfbench
+                # average=False is the actual configuration used by tfbench
                 'horovod': lambda: HorovodTrainer(),
                 'parameter_server': lambda: SyncMultiGPUTrainerParameterServer(NR_GPU, ps_device='cpu')
             }[args.variable_update]()
@@ -275,7 +275,6 @@ if __name__ == '__main__':
         steps_per_epoch=50,
         max_epoch=10,
     )
-
 
     # consistent with tensorflow/benchmarks
     trainer.COLOCATE_GRADIENTS_WITH_OPS = False

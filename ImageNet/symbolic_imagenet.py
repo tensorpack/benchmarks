@@ -3,12 +3,12 @@
 # File: symbolic_imagenet.py
 
 import os
-import numpy as np
 import tensorflow as tf
 from tensorpack.dataflow import dataset
 from tensorpack.utils import logger
 
 __all__ = ['get_imglist', 'build_pipeline', 'lighting']
+
 
 def get_imglist(dir, name):
     """
@@ -112,13 +112,14 @@ def training_mapper(filename, label):
         image = tf.cond(is_bad, bad, good)
         image = tf.reverse(image, [2])
     # TODO imgproc
-    #image = lighting(image, 0.1,
+    # image = lighting(image, 0.1,
     #    eigval=np.array([0.2175, 0.0188, 0.0045], dtype='float32') * 255.0,
     #    eigvec=np.array([[-0.5675, 0.7192, 0.4009],
     #                     [-0.5808, -0.0045, -0.8140],
     #                     [-0.5836, -0.6948, 0.4203]], dtype='float32'))
     image = tf.image.random_flip_left_right(image)
     return image, label
+
 
 def validation_mapper(filename, label):
     byte = tf.read_file(filename)
@@ -129,6 +130,7 @@ def validation_mapper(filename, label):
     image = resize_shortest_edge(image, tf.shape(image), 256)
     image = center_crop(image, 224)
     return image, label
+
 
 def build_pipeline(imglist, training, batch, parallel):
     """

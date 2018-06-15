@@ -20,9 +20,11 @@ else:
 Y_train = np.random.random((batch_size,)).astype('int32')
 Y_train = np_utils.to_categorical(Y_train, nb_classes)
 
+
 def gen():
     while True:
         yield (X_train, Y_train)
+
 
 model = Sequential()
 model.add(Convolution2D(64, 11, strides=4, padding='valid', input_shape=X_train.shape[1:]))

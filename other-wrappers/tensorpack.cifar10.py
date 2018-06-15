@@ -1,13 +1,14 @@
 #!/usr/bin/env python
-# -*- coding: UTF-8 -*-
+# -*- coding: utf-8 -*-
 # File: tensorpack.cifar10.py
 import tensorflow as tf
 from tensorpack import *
 
+
 class Model(ModelDesc):
     def inputs(self):
         return [tf.placeholder(tf.float32, [None, 32, 32, 3], 'input'),
-                tf.placeholder(tf.int32, [None], 'label') ]
+                tf.placeholder(tf.int32, [None], 'label')]
 
     def build_graph(self, image, label):
         image = tf.transpose(image, [0, 3, 1, 2])
@@ -46,6 +47,7 @@ def get_data(train_or_test):
     ds = BatchData(ds, 32, remainder=not isTrain)
     return ds
 
+
 if __name__ == '__main__':
     dataset_train = get_data('train')
     dataset_test = get_data('test')
@@ -53,7 +55,7 @@ if __name__ == '__main__':
         model=Model(),
         data=QueueInput(dataset_train,
                         queue=tf.FIFOQueue(300, [tf.float32, tf.int32])),
-        #callbacks=[InferenceRunner(dataset_test, ClassificationError('wrong'))],   # skip validation
+        # callbacks=[InferenceRunner(dataset_test, ClassificationError('wrong'))],   # skip validation
         callbacks=[],
         # keras monitor these two live data during training. do it here (no overhead actually)
         extra_callbacks=[ProgressBar(['cost', 'train_error']), MergeAllSummaries()],

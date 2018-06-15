@@ -9,6 +9,7 @@ import argparse
 
 from tensorpack.dataflow import *
 
+
 class RawILSVRC12(DataFlow):
     def __init__(self, dir, name):
         self.dir = os.path.join(dir, name)
@@ -32,6 +33,7 @@ class RawILSVRC12(DataFlow):
 
     def size(self):
         return len(self.imglist)
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()

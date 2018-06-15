@@ -11,7 +11,8 @@ Python 3.6, TF 1.6.0, cuda 9, cudnn 7.0.5, Keras 2.1.5, tflearn 0.3.2, tensorpac
 	* True data for Cifar10.
 	* For ImageNet, assumed to be a constant numpy array already available on CPU.
 		This is a reasonable setting because data always has to come from somewhere to CPU anyway.
-* All sources are here. They are all <100 lines of code that you can easily run and verify.
+* __All sources are here__. They are all <100 lines of code that you can easily
+  run and verify by yourself.
 
 ### On a Single GPU:
 | Task                           | tensorpack  | Keras  | tflearn |

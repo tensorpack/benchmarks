@@ -29,7 +29,7 @@ class ImportInfo(object):
             return other._key == self._key
         return NotImplemented
 
-    def __ne__(self):
+    def __ne__(self, other):
         return not self == other
 
 
@@ -109,7 +109,6 @@ class ImportProfilerContext(object):
             node = visited[k]
             cumtime = node[0] * 1000
             name = node[1]
-            context_name = node[2]
             level = node[3]
             intime = node[-1] * 1000
             if cumtime > threshold and level < 6:

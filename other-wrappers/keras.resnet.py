@@ -18,9 +18,11 @@ else:
 Y_train = np.random.random((batch_size,)).astype('int32')
 Y_train = np_utils.to_categorical(Y_train, 1000)
 
+
 def gen():
     while True:
         yield (X_train, Y_train)
+
 
 model = ResNet50(weights=None, input_shape=X_train.shape[1:])
 
