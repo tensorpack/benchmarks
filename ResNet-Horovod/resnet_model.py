@@ -5,9 +5,9 @@
 import tensorflow as tf
 
 
-from tensorpack.tfutils.argscope import argscope, get_arg_scope
+from tensorpack.tfutils.argscope import argscope
 from tensorpack.models import (
-    Conv2D, MaxPooling, GlobalAvgPooling, BatchNorm, FullyConnected)
+    Conv2D, MaxPooling, GlobalAvgPooling, BatchNorm, FullyConnected, BNReLU)
 
 
 def resnet_shortcut(l, n_out, stride, activation=tf.identity):

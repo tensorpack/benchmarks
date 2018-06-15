@@ -3,16 +3,14 @@
 # File: imagenet-resnet-horovod.py
 
 import argparse
+import sys
 import os
 import socket
 import numpy as np
-import multiprocessing as mp
-import cv2
 
 import tensorflow as tf
 from tensorpack import *
 from tensorpack.tfutils import argscope, get_model_loader
-from tensorpack.utils.gpu import get_nr_gpu
 
 import horovod.tensorflow as hvd
 
@@ -72,7 +70,12 @@ def get_config(model, fake=False):
         steps_per_epoch = 50
     else:
         logger.info("#Tower: {}; Batch size per tower: {}".format(hvd.size(), batch))
-        data = ZMQInput('ipc://@imagenet-train-b{}'.format(batch), 30, bind=False)
+        zmq_addr = 'ipc://@imagenet-train-b{}'.format(batch)
+        if args.no_zmq_ops:
+            dataflow = RemoteDataZMQ(zmq_addr, hwm=150, bind=False)
+            data = QueueInput(dataflow)
+        else:
+            data = ZMQInput(zmq_addr, 30, bind=False)
         data = StagingInput(data, nr_stage=1)
 
         steps_per_epoch = int(np.round(1281167 / total_batch))
@@ -97,17 +100,17 @@ def get_config(model, fake=False):
     if BASE_LR > 0.1:
         """
         Sec 2.2: In practice, with a large minibatch of size kn, we start from a learning rate of η and increment
-        it by a constant amount at each iteration such that it reachesη = kη after 5 epochs. After the warmup phase, we go back
-        to the original learning rate schedule.
+        it by a constant amount at each iteration such that it reachesη = kη after 5 epochs.
+        After the warmup phase, we go back to the original learning rate schedule.
         """
         callbacks.append(
             ScheduledHyperParamSetter(
                 'learning_rate', [(0, 0.1), (5 * steps_per_epoch, BASE_LR)],
                 interp='linear', step_based=True))
 
-    # TODO For distributed training, you probably don't want everyone to wait for validation.
-    # Better to start a separate job, since the model is saved.
     if args.validation is not None:
+        # TODO For distributed training, you probably don't want everyone to wait for master doing validation.
+        # Better to start a separate job, since the model is saved.
         if args.validation == 'master' and hvd.rank() == 0:
             # For reproducibility, do not use remote data for validation
             dataset_val = get_val_dataflow(
@@ -115,10 +118,11 @@ def get_config(model, fake=False):
             infs = [ClassificationError('wrong-top1', 'val-error-top1'),
                     ClassificationError('wrong-top5', 'val-error-top5')]
             callbacks.append(InferenceRunner(QueueInput(dataset_val), infs))
+        # For simple validation tasks such as image classification, distributed validation is possible.
         elif args.validation == 'distributed':
             dataset_val = get_val_dataflow(
                 args.data, 64, fbresnet_augmentor(False),
-                num_splits=hvd.size(), split_index=hvd.rank())  # For reproducibility, do not use remote data for validation
+                num_splits=hvd.size(), split_index=hvd.rank())
             infs = [HorovodClassificationError('wrong-top1', 'val-error-top1'),
                     HorovodClassificationError('wrong-top5', 'val-error-top5')]
             callbacks.append(
@@ -129,7 +133,7 @@ def get_config(model, fake=False):
         data=data,
         callbacks=callbacks,
         steps_per_epoch=steps_per_epoch,
-        max_epoch=35 if args.fake else 90,
+        max_epoch=35 if args.fake else 95,
     )
 
 
@@ -142,7 +146,10 @@ if __name__ == '__main__':
     parser.add_argument('-d', '--depth', help='resnet depth',
                         type=int, default=50, choices=[50, 101, 152])
     parser.add_argument('--eval', action='store_true', help='run evaluation with --load instead of training.')
-    parser.add_argument('--validation', choices=['distributed', 'master'])
+    parser.add_argument('--validation', choices=['distributed', 'master'],
+                        help='Validation method. By default it does no validation.')
+    parser.add_argument('--no-zmq-ops', help='use pure python to send/receive data',
+                        action='store_true')
     """
     Sec 2.3: We keep the per-worker sample size n constant when we change the number of workers k.
     In this work, we use n = 32 which has performed well for a wide range of datasets and networks.
@@ -150,24 +157,28 @@ if __name__ == '__main__':
     parser.add_argument('--batch', help='per-GPU batch size', default=32, type=int)
     args = parser.parse_args()
 
-    logger.info("Running on {}".format(socket.gethostname()))
-
     if args.eval:
         batch = 128    # something that can run on one gpu
         ds = get_val_dataflow(args.data, batch, fbresnet_augmentor(False))
         model = Model(args.depth)
         eval_on_ILSVRC12(model, get_model_loader(args.load), ds)
-    else:
-        assert args.load is None
-        hvd.init()
-        if hvd.rank() == 0:
-            logger.set_logger_dir(args.logdir, 'd')
+        sys.exit()
 
-        model = Model(args.depth, loss_scale=1.0 / hvd.size())
-        config = get_config(model, fake=args.fake)
-        """
-        Sec 3: standard communication primitives like
-        allreduce [11] perform summing, not averaging
-        """
-        trainer = HorovodTrainer(average=False)
-        launch_train_with_config(config, trainer)
+    logger.info("Training on {}".format(socket.gethostname()))
+    # Print some information for sanity check.
+    os.system("nvidia-smi")
+
+    assert args.load is None
+    hvd.init()
+    if hvd.rank() == 0:
+        logger.set_logger_dir(args.logdir, 'd')
+    logger.info("Rank={}, Local Rank={}, Size={}".format(hvd.rank(), hvd.local_rank(), hvd.size()))
+
+    model = Model(args.depth, loss_scale=1.0 / hvd.size())
+    config = get_config(model, fake=args.fake)
+    """
+    Sec 3: standard communication primitives like
+    allreduce [11] perform summing, not averaging
+    """
+    trainer = HorovodTrainer(average=False)
+    launch_train_with_config(config, trainer)

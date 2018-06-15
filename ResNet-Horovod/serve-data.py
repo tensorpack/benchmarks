@@ -33,6 +33,7 @@ if __name__ == '__main__':
     parser.add_argument('--batch', help='per-GPU batch size',
                         default=32, type=int)
     parser.add_argument('--benchmark', action='store_true')
+    parser.add_argument('--no-zmq-ops', action='store_true')
     args = parser.parse_args()
 
     os.environ['CUDA_VISIBLE_DEVICES'] = ''
@@ -45,12 +46,13 @@ if __name__ == '__main__':
         augs = fbresnet_augmentor(True) if args.aug == 'fbresnet' else small_augmentor()
         ds = get_data(args.batch, augs)
 
-    logger.info("Running on {}".format(socket.gethostname()))
+    logger.info("Serving data on {}".format(socket.gethostname()))
 
     if args.benchmark:
         ds = MapData(ds, dump_arrays)
         TestDataSpeed(ds, warmup=300).start()
     else:
+        format = None if args.no_zmq_ops else 'zmq_ops'
         send_dataflow_zmq(
             ds, 'ipc://@imagenet-train-b{}'.format(args.batch),
-            hwm=150, format='zmq_ops', bind=True)
+            hwm=150, format=format, bind=True)

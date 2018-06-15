@@ -11,7 +11,6 @@ from abc import abstractmethod
 
 from tensorpack import imgaug, dataset, ModelDesc
 from tensorpack.dataflow import (
-    AugmentImageComponent, PrefetchDataZMQ,
     BatchData, MultiThreadMapData, DataFromList)
 from tensorpack.predict import PredictConfig, SimpleDatasetPredictor
 from tensorpack.utils.stats import RatioCounter
@@ -116,6 +115,7 @@ def get_val_dataflow(
     if num_splits is None:
         ds = dataset.ILSVRC12Files(datadir, 'val', shuffle=False)
     else:
+        # shard validation data
         assert split_index < num_splits
         files = dataset.ILSVRC12Files(datadir, 'val', shuffle=False)
         files.reset_state()
@@ -134,9 +134,9 @@ def get_val_dataflow(
         im = cv2.imread(fname, cv2.IMREAD_COLOR)
         im = aug.augment(im)
         return im, cls
-    ds = MultiThreadMapData(ds, parallel, mapf, buffer_size=2000, strict=True)
+    ds = MultiThreadMapData(ds, parallel, mapf,
+                            buffer_size=min(2000, ds.size()), strict=True)
     ds = BatchData(ds, batch_size, remainder=True)
-    # ds = PrefetchDataZMQ(ds, 1)
     # do not fork() under MPI
     return ds
 
