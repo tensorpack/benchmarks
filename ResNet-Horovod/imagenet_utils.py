@@ -120,11 +120,11 @@ def get_val_dataflow(
         files = dataset.ILSVRC12Files(datadir, 'val', shuffle=False)
         files.reset_state()
         files = list(files.get_data())
-        logger.info("#ValidationData = {}".format(len(files)))
+        logger.info("Number of validation data = {}".format(len(files)))
         split_size = len(files) // num_splits
         start, end = split_size * split_index, split_size * (split_index + 1)
         end = min(end, len(files))
-        logger.info("#ValidationSplit = {} - {}".format(start, end))
+        logger.info("Local validation split = {} - {}".format(start, end))
         files = files[start: end]
         ds = DataFromList(files, shuffle=False)
     aug = imgaug.AugmentorList(augmentors)
