@@ -31,7 +31,8 @@ class Model(ImageNetModel):
 
     def get_logits(self, image):
         with argscope([Conv2D, MaxPooling, GlobalAvgPooling, BatchNorm], data_format='NCHW'):
-            return resnet_backbone(image, self.num_blocks, resnet_group, resnet_bottleneck)
+            with argscope(BatchNorm, sync_statistics='horovod'):
+                return resnet_backbone(image, self.num_blocks, resnet_group, resnet_bottleneck)
 
     def build_graph(self, *inputs):
         """
