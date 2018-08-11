@@ -59,17 +59,18 @@ $ ./serve-data.py --data ~/data/imagenet/ --batch 64 --benchmark
 
 ## Distributed ResNet50 Results:
 
- | devices   | batch per GPU | time    | top1 err |
- | -         | -             | -       | -        |
- | 32 P100s  | 64            | 5h9min  | 23.73%   |
- | 128 P100s | 32            | 1h40min | 23.62%   |
- | 128 P100s | 64            | 1h23min | 23.97%   |
- | 256 P100s | 32            | 1h9min  | 23.90%   |
+ | devices   | batch per GPU | time   <sup>[1](#ft1)</sup> | top1 err <sup>[3](#ft3)</sup>|
+ | -         | -             | -                           | -        |
+ | 32 P100s  | 64            | 5h9min                      | 23.73%   |
+ | 128 P100s | 32            | 1h40min                     | 23.62%   |
+ | 128 P100s | 64            | 1h23min                     | 23.97%   |
+ | 256 P100s | 32            | 1h9min <sup>[2](#ft2)</sup> | 23.90%   |
 
 
-Notes:
-1. Validation time excluded from total time. Time depends on your hardware.
+<a id="ft1">1</a>: Validation time excluded from total time. Time depends on your hardware.
 
-2. Although it does not scale very ideally with 32 machines, the code does scale with 90+% efficiency on 2 or 4 machines.
+<a id="ft2">2</a>: This corresponds to exactly the "1 hour" setting in the original paper.
 
-3. The final error typically has ±0.1 or more fluctuation according to the paper.
+<a id="ft3">3</a>: The final error typically has ±0.1 or more fluctuation according to the paper.
+
+Although the code does not scale very ideally with 32 machines, it does scale with 90+% efficiency on 2 or 4 machines.
