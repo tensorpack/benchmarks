@@ -1,19 +1,19 @@
 ## Benchmark CNN with other TF high-level APIs
 
-Tensorpack is 1.2x~5x faster than the equivalent code written in some other TF high-level APIs.
+Tensorpack is __1.2x~5x__ faster than the equivalent code written in some other TF high-level APIs.
 
 ### Benchmark setting:
 
 * Hardware: AWS p3.16xlarge (8 Tesla V100s)
 * Software:
 Python 3.6, TF 1.6.0, cuda 9, cudnn 7.0.5, Keras 2.1.5, tflearn 0.3.2, tensorpack 0.8.3.
-* Measurement: speed is measured by images per second (larger is better). First epoch is warmup and
+* Measurement: speed is measured by images per second (__larger is better__). First epoch is warmup and
 	is not considered in timing. Second or later epochs have statistically insignificant difference.
 * Data:
 	* True data for Cifar10.
 	* For ImageNet, assumed to be a constant numpy array already available on CPU.
 		This is a reasonable setting because data always has to come from somewhere to CPU anyway.
-* __All sources are here__. They are all <100 lines of code that you can easily
+* __Source code is here__. They are all <100 lines that you can easily
   run and verify by yourself.
 
 ### On a Single GPU:

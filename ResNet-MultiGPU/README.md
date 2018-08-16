@@ -1,21 +1,22 @@
 
-# Benchmark MultiGPU training against tensorflow/benchmarks
+# Benchmark Multi-GPU training against tensorflow/benchmarks
 
-Tensorpack MultiGPU trainers are implemented following the awesome examples in
+Tensorpack Multi-GPU trainers are implemented following the awesome examples in
 [tensorflow/benchmarks](https://github.com/tensorflow/benchmarks).
 Their performance should be the same.
 
 This script is focused on the performance of different parallel strategies.
-To train on real data with reasonable experiments settings, see [ResNet-Horovod](../ResNet-Horovod).
+To train on real data with reasonable experiments settings, see
+[Tensorpack ResNet example](https://github.com/tensorpack/tensorpack/tree/master/examples/ResNet) or [ResNet-Horovod benchmark](../ResNet-Horovod).
 
 ## Scripts:
 
-The following commands in `tensorflow/benchmarks`
+The following command in tensorflow/benchmarks:
 ```
 python tf_cnn_benchmarks.py --num_gpus=8 --batch_size=64 --model=resnet50 --variable_update=replicated/parameter_server --local_parameter_device=cpu
 ```
 
-is roughly the same as this tensorpack script:
+is roughly the same as this command in tensorpack:
 ```
 python resnet-multigpu.py --fake-location gpu --variable-update=replicated/parameter_server
 ```
