@@ -26,6 +26,7 @@ DATA_PID=$!
 
 # launch training
 # https://www.open-mpi.org/faq/?category=openfabrics#ib-router has document on IB options
+# the queue parameters sometimes can hang the communication (for some MPI versions and some operations)
 mpirun -output-filename logs/train-$SLURM_JOB_ID.log -tag-output \
 	-bind-to none -map-by slot \
 	-mca pml ob1 -mca btl_openib_receive_queues P,128,32:P,2048,32:P,12288,32:P,65536,32 \

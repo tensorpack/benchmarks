@@ -28,8 +28,7 @@ $ mpirun -np 8 --output-filename test.log python3 ./imagenet-resnet-horovod.py -
 host1$ ./serve-data.py --data ~/data/imagenet/ --batch 64
 host2$ ./serve-data.py --data ~/data/imagenet/ --batch 64
 $ mpirun -np 16 -H host1:8,host2:8 --output-filename test.log \
-		-bind-to none -map-by slot \
-		-mca pml ob1 -mca btl_openib_receive_queues P,128,32:P,2048,32:P,12288,32:P,65536,32 \
+		-bind-to none -map-by slot -mca pml ob1 \
 	  -x NCCL_IB_CUDA_SUPPORT=1 -x NCCL_IB_DISABLE=0 -x NCCL_DEBUG=INFO \
 		-x PATH -x PYTHONPATH -x LD_LIBRARY_PATH \
 		python3 ./imagenet-resnet-horovod.py -d 50 \
@@ -38,15 +37,14 @@ $ mpirun -np 16 -H host1:8,host2:8 --output-filename test.log \
 
 Notes:
 1. MPI does not like fork(), so running `serve-data.py` inside MPI is not a good idea.
-2. You'll need to pick the best mca & NCCL options for your own systems.
+2. You may tune the best mca & NCCL options for your own systems.
    See [horovod docs](https://github.com/uber/horovod/blob/master/docs/) for details.
    Note that TCP connection will then have much worse scaling efficiency.
 3. To train on small datasets, __you don't need a separate data serving process or zmq ops__.
 	You can simply load data inside each training process with its own data loader.
 	The main motivation to use a separate data loader is to avoid fork() inside
 	MPI and to make it easier to benchmark.
-4. You can pass `--no-zmq-ops` to both scripts, to use Python for
-   communication instead of the faster zmq_ops.
+4. You can pass `--no-zmq-ops` to both scripts, to use Python for communication instead of the faster zmq_ops.
 5. If you're using slurm in a cluster, checkout an example [sbatch script](slurm.script).
 
 ## Performance Benchmark:
