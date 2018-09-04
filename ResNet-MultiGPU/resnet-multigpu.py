@@ -57,10 +57,10 @@ class Model(ModelDesc):
         loss = tf.reduce_mean(loss, name='xentropy-loss')
         # TODO tensorflow/benchmark only computes WD on 1 GPU.
         if False:
-            self.cost = loss    # disable wd
+            return loss    # disable wd
         else:
             wd_cost = regularize_cost('.*', tf.nn.l2_loss) * 1e-4
-            self.cost = tf.add_n([loss, wd_cost], name='cost')
+            return tf.add_n([loss, wd_cost], name='cost')
 
 
 @contextmanager
@@ -263,6 +263,7 @@ if __name__ == '__main__':
         model=M(data_format=args.data_format),
         callbacks=[
             GPUUtilizationTracker(),
+            PeakMemoryTracker(),
             # ModelSaver(checkpoint_dir='./tmpmodel'),  # it takes time
         ],
         extra_callbacks=[
