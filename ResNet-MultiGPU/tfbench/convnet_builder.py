@@ -152,14 +152,14 @@ class ConvNetBuilder(object):
            use_batch_norm=None,
            stddev=None,
            activation='relu',
-           bias=0.0):
+           bias=0.0,
+           kernel_initializer=None):
     """Construct a conv2d layer on top of cnn."""
     if input_layer is None:
       input_layer = self.top_layer
     if num_channels_in is None:
       num_channels_in = self.top_size
-    kernel_initializer = None
-    if stddev is not None:
+    if stddev is not None and kernel_initializer is None:
       kernel_initializer = tf.truncated_normal_initializer(stddev=stddev)
     name = 'conv' + str(self.counts['conv'])
     self.counts['conv'] += 1
@@ -369,7 +369,7 @@ class ConvNetBuilder(object):
     self.counts['spatial_mean'] += 1
     axes = [1, 2] if self.data_format == 'NHWC' else [2, 3]
     self.top_layer = tf.reduce_mean(
-        self.top_layer, axes, keep_dims=keep_dims, name=name)
+        self.top_layer, axes, keepdims=keep_dims, name=name)
     return self.top_layer
 
   def dropout(self, keep_prob=0.5, input_layer=None):
@@ -382,7 +382,8 @@ class ConvNetBuilder(object):
       if not self.phase_train:
         keep_prob = 1.0
       if self.use_tf_layers:
-        dropout = core_layers.dropout(input_layer, 1. - keep_prob)
+        dropout = core_layers.dropout(input_layer, 1. - keep_prob,
+                                      training=self.phase_train)
       else:
         dropout = tf.nn.dropout(input_layer, keep_prob)
       self.top_layer = dropout
