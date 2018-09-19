@@ -4,6 +4,7 @@
 
 import os
 import tensorflow as tf
+import numpy as np
 from tensorpack.dataflow import dataset
 from tensorpack.utils import logger
 
@@ -75,43 +76,37 @@ def training_mapper(filename, label):
     byte = tf.read_file(filename)
 
     jpeg_opt = {'fancy_upscaling': True, 'dct_method': 'INTEGER_ACCURATE'}
-    if False:   # whether to use  fuse decode & crop
+    jpeg_shape = tf.image.extract_jpeg_shape(byte)  # hwc
+    bbox_begin, bbox_size, distort_bbox = tf.image.sample_distorted_bounding_box(
+        jpeg_shape,
+        bounding_boxes=tf.zeros(shape=[0, 0, 4]),
+        min_object_covered=0,
+        aspect_ratio_range=[0.75, 1.33],
+        area_range=[0.08, 1.0],
+        max_attempts=10,
+        use_image_if_no_bounding_boxes=True)
+
+    is_bad = tf.reduce_sum(tf.cast(tf.equal(bbox_size, jpeg_shape), tf.int32)) >= 2
+
+    def good():
+        offset_y, offset_x, _ = tf.unstack(bbox_begin)
+        target_height, target_width, _ = tf.unstack(bbox_size)
+        crop_window = tf.stack([offset_y, offset_x, target_height, target_width])
+
+        image = tf.image.decode_and_crop_jpeg(
+            byte, crop_window, channels=3, **jpeg_opt)
+        image = uint8_resize_bicubic(image, [224, 224])
+        return image
+
+    def bad():
         image = tf.image.decode_jpeg(
             tf.reshape(byte, shape=[]), 3, **jpeg_opt)
-        image = tf.image.resize_bilinear([image], [224, 224])[0]
-    else:
-        jpeg_shape = tf.image.extract_jpeg_shape(byte)  # hwc
-        bbox_begin, bbox_size, distort_bbox = tf.image.sample_distorted_bounding_box(
-            jpeg_shape,
-            bounding_boxes=tf.zeros(shape=[0, 0, 4]),
-            min_object_covered=0,
-            aspect_ratio_range=[0.75, 1.33],
-            area_range=[0.08, 1.0],
-            max_attempts=10,
-            use_image_if_no_bounding_boxes=True)
+        image = resize_shortest_edge(image, jpeg_shape, 224)
+        image = center_crop(image, 224)
+        return image
 
-        is_bad = tf.reduce_sum(tf.cast(tf.equal(bbox_size, jpeg_shape), tf.int32)) >= 2
-
-        def good():
-            offset_y, offset_x, _ = tf.unstack(bbox_begin)
-            target_height, target_width, _ = tf.unstack(bbox_size)
-            crop_window = tf.stack([offset_y, offset_x, target_height, target_width])
-
-            image = tf.image.decode_and_crop_jpeg(
-                byte, crop_window, channels=3, **jpeg_opt)
-            image = uint8_resize_bicubic(image, [224, 224])
-            return image
-
-        def bad():
-            image = tf.image.decode_jpeg(
-                tf.reshape(byte, shape=[]), 3, **jpeg_opt)
-            image = resize_shortest_edge(image, jpeg_shape, 224)
-            image = center_crop(image, 224)
-            return image
-
-        image = tf.cond(is_bad, bad, good)
-        image = tf.reverse(image, [2])
-    # TODO imgproc
+    image = tf.cond(is_bad, bad, good)
+    # TODO other imgproc
     # image = lighting(image, 0.1,
     #    eigval=np.array([0.2175, 0.0188, 0.0045], dtype='float32') * 255.0,
     #    eigvec=np.array([[-0.5675, 0.7192, 0.4009],
@@ -141,6 +136,8 @@ def build_pipeline(imglist, training, batch, parallel):
         parallel (int):
 
     If training, returns an infinite dataset.
+
+    Note that it produces RGB images, not BGR.
     """
     N = len(imglist)
     filenames = tf.constant([k[0] for k in imglist], name='filenames')
