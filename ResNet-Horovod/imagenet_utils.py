@@ -195,6 +195,7 @@ class ImageNetModel(ModelDesc):
     Scale the loss, for whatever reasons (e.g., gradient averaging, fp16 training, etc)
     """
     loss_scale = 1.
+
     def inputs(self):
         return [tf.placeholder(self.image_dtype, [None, self.image_shape, self.image_shape, 3], 'input'),
                 tf.placeholder(tf.int32, [None], 'label')]

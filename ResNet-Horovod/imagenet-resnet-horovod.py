@@ -21,8 +21,7 @@ from resnet_model import (
 
 
 class Model(ImageNetModel):
-    def __init__(self, depth, loss_scale=1.0):
-        self._loss_scale = loss_scale
+    def __init__(self, depth):
         self.num_blocks = {
             50: [3, 4, 6, 3],
             101: [3, 4, 23, 3],
@@ -32,16 +31,6 @@ class Model(ImageNetModel):
     def get_logits(self, image):
         with argscope([Conv2D, MaxPooling, GlobalAvgPooling, BatchNorm], data_format='NCHW'):
             return resnet_backbone(image, self.num_blocks, resnet_group, resnet_bottleneck)
-
-    def build_graph(self, *inputs):
-        """
-        Sec 3: Remark 3: Normalize the per-worker loss by
-        total minibatch size kn, not per-worker size n.
-        """
-        cost = super(Model, self).build_graph(*inputs)
-        if self._loss_scale != 1.0:
-            cost = cost * self._loss_scale
-        return cost
 
 
 class HorovodClassificationError(ClassificationError):
@@ -182,7 +171,12 @@ if __name__ == '__main__':
         logger.set_logger_dir(args.logdir, 'd')
     logger.info("Rank={}, Local Rank={}, Size={}".format(hvd.rank(), hvd.local_rank(), hvd.size()))
 
-    model = Model(args.depth, loss_scale=1.0 / hvd.size())
+    model = Model(args.depth)
+    """
+    Sec 3: Remark 3: Normalize the per-worker loss by
+    total minibatch size kn, not per-worker size n.
+    """
+    model.loss_scale = 1.0 / hvd.size()
     config = get_config(model, fake=args.fake)
     """
     Sec 3: standard communication primitives like
