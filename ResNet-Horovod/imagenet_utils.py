@@ -79,6 +79,9 @@ def fbresnet_augmentor(isTrain):
         """
         augmentors = [
             GoogleNetResize(),
+            # It's OK to remove the following augs if your CPU is not fast enough.
+            # Removing brightness/contrast/saturation does not have a significant effect on accuracy.
+            # Removing lighting leads to a tiny drop in accuracy.
             imgaug.RandomOrderAug(
                 [imgaug.BrightnessScale((0.6, 1.4), clip=False),
                  imgaug.Contrast((0.6, 1.4), clip=False),
@@ -159,43 +162,75 @@ def eval_on_ILSVRC12(model, sessinit, dataflow):
 
 
 class ImageNetModel(ModelDesc):
-    weight_decay = 1e-4
     image_shape = 224
+
+    """
+    uint8 instead of float32 is used as input type to reduce copy overhead.
+    It might hurt the performance a liiiitle bit.
+    The pretrained models were trained with float32.
+    """
     image_dtype = tf.uint8
 
+    """
+    Either 'NCHW' or 'NHWC'
+    """
+    data_format = 'NCHW'
+
+    """
+    Whether the image is BGR or RGB. If using DataFlow, then it should be BGR.
+    """
+    image_bgr = True
+
+    weight_decay = 1e-4
+
+    """
+    To apply on normalization parameters, use '.*/W|.*/gamma|.*/beta'
+
+    Sec 5.1: We use a weight decay λ of 0.0001 and following [16] we do not apply
+    weight decay on the learnable BN coefficients
+    """
+    weight_decay_pattern = '.*/W'
+
+    """
+    Scale the loss, for whatever reasons (e.g., gradient averaging, fp16 training, etc)
+    """
+    loss_scale = 1.
     def inputs(self):
         return [tf.placeholder(self.image_dtype, [None, self.image_shape, self.image_shape, 3], 'input'),
                 tf.placeholder(tf.int32, [None], 'label')]
 
     def build_graph(self, image, label):
-        image = ImageNetModel.image_preprocess(image, bgr=True)
+        image = ImageNetModel.image_preprocess(image, bgr=self.image_bgr)
+        assert self.data_format == 'NCHW'
         image = tf.transpose(image, [0, 3, 1, 2])
 
         logits = self.get_logits(image)
         loss = ImageNetModel.compute_loss_and_error(logits, label)
 
         if self.weight_decay > 0:
-            """
-            Sec 5.1: We use a weight decay λ of 0.0001 and following [16] we do not apply
-            weight decay on the learnable BN coefficients
-            """
-            wd_loss = regularize_cost('.*/W', tf.contrib.layers.l2_regularizer(self.weight_decay),
+            wd_loss = regularize_cost(self.weight_decay_pattern,
+                                      tf.contrib.layers.l2_regularizer(self.weight_decay),
                                       name='l2_regularize_loss')
             add_moving_summary(loss, wd_loss)
-            ret = tf.add_n([loss, wd_loss], name='cost')
+            total_cost = tf.add_n([loss, wd_loss], name='cost')
         else:
-            ret = tf.identity(loss, name='cost')
-            add_moving_summary(ret)
-        return ret
+            total_cost = tf.identity(loss, name='cost')
+            add_moving_summary(total_cost)
+
+        if self.loss_scale != 1.:
+            logger.info("Scaling the total loss by {} ...".format(self.loss_scale))
+            return total_cost * self.loss_scale
+        else:
+            return total_cost
 
     @abstractmethod
     def get_logits(self, image):
         """
         Args:
-            image: 4D tensor of 224x224 in ``self.data_format``
+            image: 4D tensor of ``self.input_shape`` in ``self.data_format``
 
         Returns:
-            Nx1000 logits
+            Nx#class logits
         """
 
     def optimizer(self):

@@ -13,6 +13,7 @@ echo "JOBID: $SLURM_JOB_ID"
 env | grep PATH
 
 export TENSORPACK_PROGRESS_REFRESH=20
+export TENSORPACK_SERIALIZE=msgpack
 DATA_PATH=~/data/imagenet
 BATCH=64
 
