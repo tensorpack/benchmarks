@@ -1,7 +1,7 @@
 
 # tensorpack benchmarks
 
-We use TensorFlow in the efficient way. [tensorpack](https://github.com/tensorpack/tensorpack) is:
+We use TensorFlow in the efficient way. Tensorpack is:
 
 * [As fast as tensorflow/benchmarks in MultiGPU ResNet training](ResNet-MultiGPU/)
 * [Able to train ImageNet in about an hour with 256 GPUs](ResNet-Horovod/)

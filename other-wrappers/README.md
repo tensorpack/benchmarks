@@ -14,7 +14,7 @@ Python 3.6, TF 1.6.0, cuda 9, cudnn 7.0.5, Keras 2.1.5, tflearn 0.3.2, tensorpac
 	* For ImageNet, assumed to be a constant numpy array already available on CPU.
 		This is a reasonable setting because data always has to come from somewhere to CPU anyway.
 * __Source code is here__. They are all <100 lines that you can easily
-  run and verify by yourself.
+  run and __verify by yourself__.
 
 ### On a Single GPU:
 | Task                           | tensorpack  | Keras  | tflearn |
