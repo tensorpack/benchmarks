@@ -86,7 +86,7 @@ def get_config(model, fake=False):
         ModelSaver(max_to_keep=100),
         EstimatedTimeLeft(),
         ScheduledHyperParamSetter(
-            'learning_rate', [(30, BASE_LR * 1e-1), (60, BASE_LR * 1e-2),
+            'learning_rate', [(0, BASE_LR), (30, BASE_LR * 1e-1), (60, BASE_LR * 1e-2),
                               (80, BASE_LR * 1e-3)]),
     ]
     if BASE_LR > 0.1:
