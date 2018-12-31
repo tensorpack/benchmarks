@@ -52,6 +52,7 @@ class Model(ModelDesc):
             image = tf.transpose(image, [0, 3, 1, 2])
 
         logits = self._get_logits(image)
+
         if logits.dtype != tf.float32:
             logger.info("Casting logits back to fp32 ...")
             logits = tf.cast(logits, tf.float32)
@@ -199,6 +200,7 @@ if __name__ == '__main__':
     parser.add_argument('--load', help='load model')
     parser.add_argument('--prefetch', type=int, default=150)
     parser.add_argument('--use-fp16', action='store_true')
+    parser.add_argument('--use-xla-compile', action='store_true')
     parser.add_argument('--batch', type=int, default=64, help='per GPU batch size')
     parser.add_argument('--data_format', help='specify NCHW or NHWC',
                         type=str, default='NCHW')
@@ -250,7 +252,7 @@ if __name__ == '__main__':
         else:
             trainer = {
                 'replicated': lambda: SyncMultiGPUTrainerReplicated(
-                    NUM_GPU, average=False, mode='nccl' if NUM_GPU >= 8 else 'cpu'),
+                    NUM_GPU, average=False, mode='hierarchical' if NUM_GPU >= 8 else 'cpu'),
                 # average=False is the actual configuration used by tfbench
                 'horovod': lambda: HorovodTrainer(),
                 'parameter_server': lambda: SyncMultiGPUTrainerParameterServer(NUM_GPU, ps_device='cpu')
@@ -263,8 +265,8 @@ if __name__ == '__main__':
         data=get_data(args.fake_location),
         model=M(data_format=args.data_format),
         callbacks=[
-            # GPUUtilizationTracker(),
-            # PeakMemoryTracker(),
+            GPUUtilizationTracker(),
+            PeakMemoryTracker(),
             # ModelSaver(checkpoint_dir='./tmpmodel'),  # it takes time
         ],
         extra_callbacks=[
@@ -280,4 +282,5 @@ if __name__ == '__main__':
 
     # consistent with tensorflow/benchmarks
     trainer.COLOCATE_GRADIENTS_WITH_OPS = False
+    trainer.XLA_COMPILE = args.use_xla_compile
     launch_train_with_config(config, trainer)
