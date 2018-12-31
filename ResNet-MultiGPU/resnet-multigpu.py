@@ -38,29 +38,31 @@ class Model(ModelDesc):
 
     def build_graph(self, image, label):
         # all-zero tensor hurt performance for some reason.
+        ctx = get_current_tower_context()
         label = tf.random_uniform(
             [args.batch],
             minval=0, maxval=1000 - 1,
             dtype=tf.int32, name='synthetic_labels')
 
         # our fake images are in [0, 1]
-        image = tf.cast(image, tf.float32) * 2.0 - 1.
+        target_dtype = tf.float16 if args.use_fp16 else tf.float32
+        if image.dtype != target_dtype:
+            image = tf.cast(image, target_dtype) * 2.0 - 1.
         if self.data_format == 'NCHW':
             image = tf.transpose(image, [0, 3, 1, 2])
 
         logits = self._get_logits(image)
         if logits.dtype != tf.float32:
-            logger.info("Casting back to fp32 ...")
+            logger.info("Casting logits back to fp32 ...")
             logits = tf.cast(logits, tf.float32)
 
         loss = tf.nn.sparse_softmax_cross_entropy_with_logits(logits=logits, labels=label)
         loss = tf.reduce_mean(loss, name='xentropy-loss')
-        # TODO tensorflow/benchmark only computes WD on 1 GPU.
-        if False:
-            return loss    # disable wd
-        else:
-            wd_cost = regularize_cost('.*', tf.nn.l2_loss) * 1e-4
+        if ctx.index == ctx.total - 1:
+            wd_cost = regularize_cost('.*', tf.nn.l2_loss) * (1e-4 * ctx.total)
             return tf.add_n([loss, wd_cost], name='cost')
+        else:
+            return loss
 
 
 @contextmanager
@@ -75,9 +77,6 @@ def maybe_freeze_updates(enable):
 class TFBenchModel(Model):
     def _get_logits(self, image):
         ctx = get_current_tower_context()
-
-        if args.use_fp16:
-            image = tf.cast(image, tf.float16)
         with maybe_freeze_updates(ctx.index > 0):
             network = ConvNetBuilder(
                 image, 3, True,
@@ -238,38 +237,40 @@ if __name__ == '__main__':
             cluster_spec, job_name=job, task_index=task_index,
             config=sessconf)
 
-    NR_GPU = get_nr_gpu()
+    NUM_GPU = get_nr_gpu()
 
     if args.job:
         trainer = {
-            'replicated': lambda: DistributedTrainerReplicated(NR_GPU, server),
-            'parameter_server': lambda: DistributedTrainerParameterServer(NR_GPU, server),
+            'replicated': lambda: DistributedTrainerReplicated(NUM_GPU, server),
+            'parameter_server': lambda: DistributedTrainerParameterServer(NUM_GPU, server),
         }[args.variable_update]()
     else:
-        if NR_GPU == 1:
+        if NUM_GPU == 1:
             trainer = SimpleTrainer()
         else:
             trainer = {
                 'replicated': lambda: SyncMultiGPUTrainerReplicated(
-                    NR_GPU, average=False, mode='hierarchical' if NR_GPU >= 8 else 'cpu'),
+                    NUM_GPU, average=False, mode='nccl' if NUM_GPU >= 8 else 'cpu'),
                 # average=False is the actual configuration used by tfbench
                 'horovod': lambda: HorovodTrainer(),
-                'parameter_server': lambda: SyncMultiGPUTrainerParameterServer(NR_GPU, ps_device='cpu')
+                'parameter_server': lambda: SyncMultiGPUTrainerParameterServer(NUM_GPU, ps_device='cpu')
             }[args.variable_update]()
+            if args.variable_update == 'replicated':
+                trainer.BROADCAST_EVERY_EPOCH = False
 
     M = TFBenchModel if args.model == 'tfbench' else TensorpackModel
     config = TrainConfig(
         data=get_data(args.fake_location),
         model=M(data_format=args.data_format),
         callbacks=[
-            GPUUtilizationTracker(),
-            PeakMemoryTracker(),
+            # GPUUtilizationTracker(),
+            # PeakMemoryTracker(),
             # ModelSaver(checkpoint_dir='./tmpmodel'),  # it takes time
         ],
         extra_callbacks=[
             # MovingAverageSummary(),   # tensorflow/benchmarks does not do this
             ProgressBar(),  # nor this
-            MergeAllSummaries(),
+            # MergeAllSummaries(),
             RunUpdateOps()
         ],
         session_config=sessconf if not args.job else None,
