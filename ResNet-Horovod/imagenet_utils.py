@@ -31,13 +31,13 @@ def fbresnet_augmentor(isTrain):
         crop from an augmented image or its horizontal flip.
         """
         augmentors = [
-            imgaug.GoogleNetRandomCropAndResize(),
+            imgaug.GoogleNetRandomCropAndResize(interp=cv2.INTER_LINEAR),
             # It's OK to remove the following augs if your CPU is not fast enough.
             # Removing brightness/contrast/saturation does not have a significant effect on accuracy.
             # Removing lighting leads to a tiny drop in accuracy.
             imgaug.RandomOrderAug(
                 [imgaug.BrightnessScale((0.6, 1.4), clip=False),
-                 imgaug.Contrast((0.6, 1.4), clip=False),
+                 imgaug.Contrast((0.6, 1.4), rgb=False, clip=False),
                  imgaug.Saturation(0.4, rgb=False),
                  # rgb-bgr conversion for the constants copied from fb.resnet.torch
                  imgaug.Lighting(0.1,
@@ -53,7 +53,7 @@ def fbresnet_augmentor(isTrain):
         ]
     else:
         augmentors = [
-            imgaug.ResizeShortestEdge(256, cv2.INTER_CUBIC),
+            imgaug.ResizeShortestEdge(256, cv2.INTER_LINEAR),
             imgaug.CenterCrop((224, 224)),
         ]
     return augmentors
