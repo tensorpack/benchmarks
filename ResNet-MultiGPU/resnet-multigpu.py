@@ -29,8 +29,8 @@ class Model(ModelDesc):
         self.data_format = data_format
 
     def inputs(self):
-        return [tf.placeholder(IMAGE_DTYPE, [args.batch, INPUT_SHAPE, INPUT_SHAPE, 3], 'input'),
-                tf.placeholder(tf.int32, [args.batch], 'label')]
+        return [tf.TensorSpec([args.batch, INPUT_SHAPE, INPUT_SHAPE, 3], IMAGE_DTYPE, 'input'),
+                tf.TensorSpec([args.batch], tf.int32, 'label')]
 
     def optimizer(self):
         lr = tf.get_variable('learning_rate', initializer=0.1, trainable=False)

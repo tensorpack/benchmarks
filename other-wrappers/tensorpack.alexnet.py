@@ -10,8 +10,8 @@ BATCH = 64
 
 class Model(ModelDesc):
     def inputs(self):
-        return [tf.placeholder(tf.float32, [BATCH, 3, 224, 224], 'input'),
-                tf.placeholder(tf.int32, [BATCH], 'label')]
+        return [tf.TensorSpec([BATCH, 3, 224, 224], tf.float32, 'input'),
+                tf.TensorSpec([BATCH], tf.int32, 'label')]
 
     def build_graph(self, image, label):
         image = image / 255.0
@@ -57,9 +57,8 @@ if __name__ == '__main__':
     dataset_train = get_data()
     config = TrainConfig(
         model=Model(),
-        data=QueueInput(dataset_train),
+        data=StagingInput(QueueInput(dataset_train)),
         callbacks=[],
-        extra_callbacks=[ProgressBar(['cost'])],
         max_epoch=100,
         steps_per_epoch=200,
     )

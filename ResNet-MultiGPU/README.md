@@ -5,8 +5,10 @@ Tensorpack Multi-GPU trainers are implemented following the awesome examples in
 [tensorflow/benchmarks](https://github.com/tensorflow/benchmarks).
 Their performance should be the same.
 
-This script is focused on the performance of different parallel strategies.
-To train on real data with reasonable experiments settings, see
+Here we measure performance by the number of images the trainer can process per second when training a ResNet-50 on ImageNet-size images.
+
+This script is tested on fake data to focus on the performance of different parallel strategies.
+To train on real data with reasonable experiment settings, see
 [Tensorpack ResNet example](https://github.com/tensorpack/tensorpack/tree/master/examples/ResNet) or [ResNet-Horovod benchmark](../ResNet-Horovod).
 
 ## Scripts:
@@ -36,10 +38,16 @@ When data comes from outside TF, my experiements show
 that `zmq-consume` is the fastest input pipeline compared to others here.
 It's also faster than `tensorflow/benchmarks` (tested on Jan 6 2018 with TF1.5.0rc0) when training real data.
 
-## Performance (image/second):
+## Performance @ Sep 2017:
 
-The following was tested with: TF v1.3.0-rc1-1302-g593dc8e on 8 P100s.
-Experiments were not run for multiple times. So expect some variance in results.
+Environment:
+* Software: TF v1.3.0-rc1-1302-g593dc8e; tensorpack 0.5.
+* Hardware: 8 P100s.
+
+Note that the latest source code uses new features in tensorpack and therefore won't work with tensorpack 0.5.
+Checkout an old version if you intend to repdouce these numbers.
+
+Experiments were not run for multiple times. So expect some small variance in results.
 
 `variable-update=replicated`:
 
@@ -59,7 +67,16 @@ Experiments were not run for multiple times. So expect some variance in results.
 | 4         | 817/802/787                | 828.29                |
 | 8         | 1651/1556/1574             | 1604.55               |
 
-## Latest Best Numbers:
-With TF v1.6.0 and option `--fake-location=gpu --variable-update=replicated`:
-	1777 image/s on P100s, 2600 image/s on V100s, 4500 image/s on V100s with fp16,
-	5361 image/s on V100s with fp16 & batch size 128x8.
+## Performance @ May 2019:
+
+Environment:
+
+* Software: TF 1.13.1, cuda 10, cudnn 7.4.2, tensorpack 0.9.4.
+* Hardware: AWS p2.16xlarge (8 V100s)
+
+Results:
+
+* `--fake-location=gpu --variable-update=replicated`: 2844 img/s.
+* `--fake-location=gpu --variable-update=replicated --use-fp16`: 5224 img/s.
+* `--fake-location=gpu --variable-update=replicated --use-fp16 --batch 128`: 5891 img/s
+* `--fake-location=gpu --variable-update=replicated --use-fp16 --batch 128 --use-xla-compile`: 9225 img/s

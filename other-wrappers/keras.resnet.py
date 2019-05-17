@@ -5,8 +5,13 @@ keras.backend.set_image_data_format('channels_first')
 from keras.applications.resnet50 import ResNet50
 from keras.utils import np_utils
 import numpy as np
+import sys
 
-NUM_GPU = 1
+try:
+    NUM_GPU = int(sys.argv[1])
+except IndexError:
+    NUM_GPU = 1
+
 batch_size = 32 * NUM_GPU
 
 img_rows, img_cols = 224, 224

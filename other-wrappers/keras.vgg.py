@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 
+import sys
 import keras
 keras.backend.set_image_data_format('channels_first')
 from keras.models import Model
@@ -7,7 +8,10 @@ from keras.utils import np_utils
 from keras.layers import *
 import numpy as np
 
-NUM_GPU = 1
+try:
+    NUM_GPU = int(sys.argv[1])
+except IndexError:
+    NUM_GPU = 1
 batch_size = 64 * NUM_GPU
 nb_classes = 1000
 nb_epoch = 200
@@ -27,7 +31,7 @@ def gen():
         yield (X_train, Y_train)
 
 
-img_input = Input(shape=X_train.shape[1:])
+img_input = Input(shape=X_train.shape[1:], dtype="float32")
 # Block 1
 x = Conv2D(64, (3, 3), activation='relu', padding='same', name='block1_conv1')(img_input)
 x = Conv2D(64, (3, 3), activation='relu', padding='same', name='block1_conv2')(x)

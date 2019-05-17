@@ -6,7 +6,7 @@ Tensorpack is __1.2x~5x__ faster than the equivalent code written in some other 
 
 * Hardware: AWS p3.16xlarge (8 Tesla V100s)
 * Software:
-Python 3.6, TF 1.6.0, cuda 9, cudnn 7.0.5, Keras 2.1.5, tflearn 0.3.2, tensorpack 0.8.3.
+Python 3.6, TF 1.13.1, cuda 10, cudnn 7.4.2, Keras 2.1.5, tflearn 0.3.2, tensorpack 0.9.4.
 * Measurement: speed is measured by images per second (__larger is better__). First epoch is warmup and
 	is not considered in timing. Second or later epochs have statistically insignificant difference.
 * Data:
@@ -19,29 +19,30 @@ Python 3.6, TF 1.6.0, cuda 9, cudnn 7.0.5, Keras 2.1.5, tflearn 0.3.2, tensorpac
 ### On a Single GPU:
 | Task                           | tensorpack  | Keras  | tflearn |
 | ------------------------------ | ----------- | ------ | ------- |
-| Keras Official Cifar10 Example | __7507__    | 3448   | 3967    |
-| VGG16 on fake ImageNet         | __226__     | 188    | 114     |
-| AlexNet on fake ImageNet       | __2633__    | 1280   | N/A     |
-| ResNet50 on fake ImageNet      | __318__     | 230    | N/A     |
+| Keras Official Cifar10 Example | __11904__   | 7142   | 5882    |
+| VGG16 on fake ImageNet         | __230__     | 204    | 194     |
+| AlexNet on fake ImageNet       | __2603__    | 1454   | N/A     |
+| ResNet50 on fake ImageNet      | __333__     | 266    | N/A     |
 
 ### Data Parallel on 8 GPUs:
 
-Each script has one line to change the number of GPUs.
+Each script used in this section can be run with "./script.py NUM_GPU" to use a different number of GPUs.
 
 |                      | 1 GPU   | 2 GPUs | 8 GPUs    |
 | -------------------- | ------- | ------ | --------- |
-| tensorpack+ResNet50  | 318     | 582    | __2177__  |
-| Keras+ResNet50       | 230     | 291    | 376       |
+| tensorpack+ResNet50  | 333     | 579    | __2245__  |
+| Keras+ResNet50       | 266     | 320    | 470       |
 |                      |         |        |           |
-| tensorpack+VGG16     | 226     | 438    | __1471__  |
-| Keras+VGG16          | 188     | 320    | 501       |
+| tensorpack+VGG16     | 230     | 438    | __1651__  |
+| Keras+VGG16          | 204     | 304    | 449       |
 
 
 
 Notes:
 
 1. With a better (but different in batch sizes, etc) setting in [../ResNet-MultiGPU/](../ResNet-MultiGPU/),
-	tensorpack can further reach 2600 im/s for ResNet50 on a p3.16xlarge instance.
+	tensorpack can further reach 2800 im/s for ResNet50 on a p3.16xlarge instance.
+	And 9225 im/s with all optimizations + fp16 turned on.
 2. It's possible for Keras to be faster (by using better input pipeline, building data-parallel graph by yourself, etc), but it's NOT
 	how most users are using Keras or how any of the Keras examples are written.
 

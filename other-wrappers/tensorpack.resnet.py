@@ -2,11 +2,15 @@
 # -*- coding: utf-8 -*-
 # File: tensorpack.resnet.py
 import tensorflow as tf
+import sys
 import numpy as np
 from tensorpack import *
 
 BATCH = 32  # tensorpack's "batch" is per-GPU batch.
-NUM_GPU = 1
+try:
+    NUM_GPU = int(sys.argv[1])
+except IndexError:
+    NUM_GPU = 1
 
 
 def resnet_shortcut(l, n_out, stride, activation=tf.identity):
@@ -36,8 +40,8 @@ def group_func(l, name, block_func, features, count, stride):
 
 class Model(ModelDesc):
     def inputs(self):
-        return [tf.placeholder(tf.float32, [None, 3, 224, 224], 'input'),
-                tf.placeholder(tf.int32, [None], 'label')]
+        return [tf.TensorSpec([None, 3, 224, 224], tf.float32, 'input'),
+                tf.TensorSpec([None], tf.int32, 'label')]
 
     def build_graph(self, image, label):
         image = image / 255.0
@@ -84,5 +88,5 @@ if __name__ == '__main__':
         steps_per_epoch=50,
     )
     trainer = SyncMultiGPUTrainerReplicated(
-        NUM_GPU, mode='hierarchical' if NR_GPU == 8 else 'cpu')
+        NUM_GPU, mode='hierarchical' if NUM_GPU == 8 else 'cpu')
     launch_train_with_config(config, trainer)
