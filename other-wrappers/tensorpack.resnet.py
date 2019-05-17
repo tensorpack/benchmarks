@@ -57,7 +57,8 @@ class Model(ModelDesc):
                       .FullyConnected('linear', 1000, activation=tf.identity)())
 
         cost = tf.nn.sparse_softmax_cross_entropy_with_logits(logits=logits, labels=label)
-        self.cost = tf.reduce_mean(cost, name='cost')
+        cost = tf.reduce_mean(cost, name='cost')
+        return cost
 
     def optimizer(self):
         return tf.train.GradientDescentOptimizer(1e-3)

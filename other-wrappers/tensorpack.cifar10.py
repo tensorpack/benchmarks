@@ -30,11 +30,12 @@ class Model(ModelDesc):
                       .FullyConnected('linear', 10, activation=tf.identity)())
 
         cost = tf.nn.sparse_softmax_cross_entropy_with_logits(logits=logits, labels=label)
-        self.cost = tf.reduce_mean(cost, name='cost')
+        cost = tf.reduce_mean(cost, name='cost')
 
         wrong = tf.cast(tf.logical_not(tf.nn.in_top_k(logits, label, 1)), tf.float32, name='wrong')
         tf.reduce_mean(wrong, name='train_error')
         # no weight decay
+        return cost
 
     def optimizer(self):
         lr = tf.get_variable('learning_rate', initializer=1e-4, trainable=False)
