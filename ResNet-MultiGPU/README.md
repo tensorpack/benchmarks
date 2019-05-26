@@ -33,7 +33,7 @@ This is the most common experiement setting in tensorpack, because it's easy to 
 * zmq-consume: consume data from a ZMQ pipe, using [my zmq ops](https://github.com/tensorpack/zmq_ops), also with GPU prefetch.
 	The data producer can therefore be written in any language.
 
-Data processing inside TF is usually a [bad idea](http://tensorpack.readthedocs.io/en/latest/tutorial/input-source.html#python-reader-or-tf-reader).
+Data processing inside TF is often a [bad idea in practice](https://tensorpack.readthedocs.io/tutorial/philosophy/dataflow.html#alternative-data-loading-solutions).
 When data comes from outside TF, my experiements show
 that `zmq-consume` is the fastest input pipeline compared to others here.
 It's also faster than `tensorflow/benchmarks` (tested on Jan 6 2018 with TF1.5.0rc0) when training real data.
