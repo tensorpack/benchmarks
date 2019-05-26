@@ -261,14 +261,23 @@ if __name__ == '__main__':
                 trainer.BROADCAST_EVERY_EPOCH = False
 
     M = TFBenchModel if args.model == 'tfbench' else TensorpackModel
+    callbacks = [
+        GPUUtilizationTracker(),
+        GPUMemoryTracker(),
+        # ModelSaver(checkpoint_dir='./tmpmodel'),  # it takes time
+    ]
+    try:
+        from tensorpack.callbacks import ThroughputTracker
+    except ImportError:
+        # only available in latest tensorpack
+        pass
+    else:
+        callbacks.append(ThroughputTracker(samples_per_step=args.batch * NUM_GPU))
+
     config = TrainConfig(
         data=get_data(args.fake_location),
         model=M(data_format=args.data_format),
-        callbacks=[
-            GPUUtilizationTracker(),
-            PeakMemoryTracker(),
-            # ModelSaver(checkpoint_dir='./tmpmodel'),  # it takes time
-        ],
+        callbacks=callbacks,
         extra_callbacks=[
             # MovingAverageSummary(),   # tensorflow/benchmarks does not do this
             ProgressBar(),  # nor this

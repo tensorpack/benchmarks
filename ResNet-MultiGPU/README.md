@@ -71,7 +71,7 @@ Experiments were not run for multiple times. So expect some small variance in re
 
 Environment:
 
-* Software: TF 1.13.1, cuda 10, cudnn 7.4.2, tensorpack 0.9.4.
+* Software: TF 1.13.1, cuda 10, cudnn 7.4.2, tensorpack 0.9.5.
 * Hardware: AWS p2.16xlarge (8 V100s)
 
 Results:
