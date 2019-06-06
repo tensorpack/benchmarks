@@ -15,21 +15,26 @@ from tensorpack.tfutils import argscope, get_model_loader
 import horovod.tensorflow as hvd
 
 from imagenet_utils import (
-    fbresnet_augmentor, get_val_dataflow, ImageNetModel, eval_on_ILSVRC12)
+    fbresnet_augmentor, get_val_dataflow, ImageNetModel, eval_classification)
 from resnet_model import (
-    resnet_group, resnet_bottleneck, resnet_backbone)
+    resnet_group, resnet_bottleneck, resnet_backbone,
+    weight_standardization_context, Norm)
 
 
 class Model(ImageNetModel):
-    def __init__(self, depth):
+    def __init__(self, depth, norm='BN', use_ws=False):
         self.num_blocks = {
             50: [3, 4, 6, 3],
             101: [3, 4, 23, 3],
             152: [3, 8, 36, 3],
         }[depth]
+        self.norm = norm
+        self.use_ws = use_ws
 
     def get_logits(self, image):
-        with argscope([Conv2D, MaxPooling, GlobalAvgPooling, BatchNorm], data_format='NCHW'):
+        with argscope([Conv2D, MaxPooling, GlobalAvgPooling, BatchNorm], data_format='NCHW'), \
+                argscope(Norm, type=self.norm), \
+                weight_standardization_context(enable=self.use_ws):
             return resnet_backbone(image, self.num_blocks, resnet_group, resnet_bottleneck)
 
 
@@ -139,6 +144,13 @@ if __name__ == '__main__':
     parser.add_argument('--fake', help='use fakedata to test or benchmark this model', action='store_true')
     parser.add_argument('-d', '--depth', help='resnet depth',
                         type=int, default=50, choices=[50, 101, 152])
+    parser.add_argument('--use-ws', action='store_true')
+    parser.add_argument('--norm', choices=['BN', 'GN'], default='BN')
+    parser.add_argument('--accum-grad', type=int, default=1)
+    parser.add_argument('--weight-decay-norm', action='store_true',
+                        help="apply weight decay on normalization layers (gamma & beta)."
+                             "This is used in torch/pytorch, and slightly "
+                             "improves validation accuracy of large models.")
     parser.add_argument('--validation', choices=['distributed', 'master'],
                         help='Validation method. By default the script performs no validation.')
     parser.add_argument('--no-zmq-ops', help='use pure python to send/receive data',
@@ -150,11 +162,15 @@ if __name__ == '__main__':
     parser.add_argument('--batch', help='per-GPU batch size', default=32, type=int)
     args = parser.parse_args()
 
+    model = Model(args.depth, args.norm, args.use_ws)
+    model.accum_grad = args.accum_grad
+    if args.weight_decay_norm:
+        model.weight_decay_pattern = ".*/W|.*/gamma|.*/beta"""
+
     if args.eval:
         batch = 128    # something that can run on one gpu
         ds = get_val_dataflow(args.data, batch, fbresnet_augmentor(False))
-        model = Model(args.depth)
-        eval_on_ILSVRC12(model, get_model_loader(args.load), ds)
+        eval_classification(model, get_model_loader(args.load), ds)
         sys.exit()
 
     logger.info("Training on {}".format(socket.gethostname()))
@@ -171,7 +187,6 @@ if __name__ == '__main__':
         logger.set_logger_dir(args.logdir, 'd')
     logger.info("Rank={}, Local Rank={}, Size={}".format(hvd.rank(), hvd.local_rank(), hvd.size()))
 
-    model = Model(args.depth)
     """
     Sec 3: Remark 3: Normalize the per-worker loss by
     total minibatch size kn, not per-worker size n.

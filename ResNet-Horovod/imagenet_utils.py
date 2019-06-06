@@ -2,27 +2,38 @@
 # -*- coding: utf-8 -*-
 # File: imagenet_utils.py
 
+"""
+This file is modified from
+https://github.com/tensorpack/tensorpack/blob/master/examples/ImageNetModels/imagenet_utils.py
+"""
 
-import cv2
-import numpy as np
+
 import multiprocessing
-import tensorflow as tf
+import numpy as np
 from abc import abstractmethod
+import cv2
+import tensorflow as tf
 
 from tensorpack import imgaug, dataset, ModelDesc
 from tensorpack.dataflow import (
     BatchData, MultiThreadMapData, DataFromList)
-from tensorpack.predict import PredictConfig, SimpleDatasetPredictor
-from tensorpack.utils.stats import RatioCounter
 from tensorpack.models import regularize_cost
+from tensorpack.predict import FeedfreePredictor, PredictConfig
 from tensorpack.tfutils.summary import add_moving_summary
+from tensorpack.tfutils.optimizer import AccumGradOptimizer
 from tensorpack.utils import logger
+from tensorpack.utils.stats import RatioCounter
+
+"""
+====== DataFlow =======
+"""
 
 
 def fbresnet_augmentor(isTrain):
     """
     Augmentor used in fb.resnet.torch, for BGR images in range [0,255].
     """
+    interpolation = cv2.INTER_LINEAR
     if isTrain:
         """
         Sec 5.1:
@@ -31,7 +42,7 @@ def fbresnet_augmentor(isTrain):
         crop from an augmented image or its horizontal flip.
         """
         augmentors = [
-            imgaug.GoogleNetRandomCropAndResize(interp=cv2.INTER_LINEAR),
+            imgaug.GoogleNetRandomCropAndResize(interp=interpolation),
             # It's OK to remove the following augs if your CPU is not fast enough.
             # Removing brightness/contrast/saturation does not have a significant effect on accuracy.
             # Removing lighting leads to a tiny drop in accuracy.
@@ -53,7 +64,7 @@ def fbresnet_augmentor(isTrain):
         ]
     else:
         augmentors = [
-            imgaug.ResizeShortestEdge(256, cv2.INTER_LINEAR),
+            imgaug.ResizeShortestEdge(256, interp=interpolation),
             imgaug.CenterCrop((224, 224)),
         ]
     return augmentors
@@ -99,19 +110,28 @@ def get_val_dataflow(
     return ds
 
 
-def eval_on_ILSVRC12(model, sessinit, dataflow):
+def eval_classification(model, sessinit, dataflow):
+    """
+    Eval a classification model on the dataset. It assumes the model inputs are
+    named "input" and "label", and contains "wrong-top1" and "wrong-top5" in the graph.
+    """
     pred_config = PredictConfig(
         model=model,
         session_init=sessinit,
         input_names=['input', 'label'],
         output_names=['wrong-top1', 'wrong-top5']
     )
-    pred = SimpleDatasetPredictor(pred_config, dataflow)
     acc1, acc5 = RatioCounter(), RatioCounter()
-    for top1, top5 in pred.get_result():
+
+    # This does not have a visible improvement over naive predictor,
+    # but will have an improvement if image_dtype is set to float32.
+    pred = FeedfreePredictor(pred_config, StagingInput(QueueInput(dataflow), device='/gpu:0'))
+    for _ in tqdm.trange(dataflow.size()):
+        top1, top5 = pred()
         batch_size = top1.shape[0]
         acc1.feed(top1.sum(), batch_size)
         acc5.feed(top5.sum(), batch_size)
+
     print("Top1 Error: {}".format(acc1.ratio))
     print("Top5 Error: {}".format(acc5.ratio))
 
@@ -151,17 +171,28 @@ class ImageNetModel(ModelDesc):
     """
     loss_scale = 1.
 
+    """
+    Label smoothing (See tf.losses.softmax_cross_entropy)
+    """
+    label_smoothing = 0.
+
+    """
+    Accumulate gradients across several steps (by default 1, which means no accumulation across steps).
+    """
+    accum_grad = 1
+
     def inputs(self):
-        return [tf.placeholder(self.image_dtype, [None, self.image_shape, self.image_shape, 3], 'input'),
-                tf.placeholder(tf.int32, [None], 'label')]
+        return [tf.TensorSpec([None, self.image_shape, self.image_shape, 3], self.image_dtype, 'input'),
+                tf.TensorSpec([None], tf.int32, 'label')]
 
     def build_graph(self, image, label):
-        image = ImageNetModel.image_preprocess(image, bgr=self.image_bgr)
+        image = self.image_preprocess(image)
         assert self.data_format == 'NCHW'
         image = tf.transpose(image, [0, 3, 1, 2])
 
         logits = self.get_logits(image)
-        loss = ImageNetModel.compute_loss_and_error(logits, label)
+        loss = ImageNetModel.compute_loss_and_error(
+            logits, label, label_smoothing=self.label_smoothing)
 
         if self.weight_decay > 0:
             wd_loss = regularize_cost(self.weight_decay_pattern,
@@ -198,14 +229,15 @@ class ImageNetModel(ModelDesc):
         """
         lr = tf.get_variable('learning_rate', initializer=0.1, trainable=False)
         tf.summary.scalar('learning_rate-summary', lr)
-        return tf.train.MomentumOptimizer(lr, 0.9, use_nesterov=True)
+        opt = tf.train.MomentumOptimizer(lr, 0.9, use_nesterov=True)
+        if self.accum_grad != 1:
+            opt = AccumGradOptimizer(opt, self.accum_grad)
+        return opt
 
-    @staticmethod
-    def image_preprocess(image, bgr=True):
+    def image_preprocess(self, image):
         with tf.name_scope('image_preprocess'):
             if image.dtype.base_dtype != tf.float32:
                 image = tf.cast(image, tf.float32)
-            image = image * (1.0 / 255)
 
             """
             Sec 5.1:
@@ -214,17 +246,26 @@ class ImageNetModel(ModelDesc):
             """
             mean = [0.485, 0.456, 0.406]    # rgb
             std = [0.229, 0.224, 0.225]
-            if bgr:
+            if self.image_bgr:
                 mean = mean[::-1]
                 std = std[::-1]
-            image_mean = tf.constant(mean, dtype=tf.float32)
-            image_std = tf.constant(std, dtype=tf.float32)
+            image_mean = tf.constant(mean, dtype=tf.float32) * 255.
+            image_std = tf.constant(std, dtype=tf.float32) * 255.
             image = (image - image_mean) / image_std
             return image
 
     @staticmethod
-    def compute_loss_and_error(logits, label):
-        loss = tf.nn.sparse_softmax_cross_entropy_with_logits(logits=logits, labels=label)
+    def compute_loss_and_error(logits, label, label_smoothing=0.):
+        if label_smoothing != 0.:
+            nclass = logits.shape[-1]
+            label = tf.one_hot(label, nclass) if label.shape.ndims == 1 else label
+
+        if label.shape.ndims == 1:
+            loss = tf.nn.sparse_softmax_cross_entropy_with_logits(logits=logits, labels=label)
+        else:
+            loss = tf.losses.softmax_cross_entropy(
+                label, logits, label_smoothing=label_smoothing,
+                reduction=tf.losses.Reduction.NONE)
         loss = tf.reduce_mean(loss, name='xentropy-loss')
 
         def prediction_incorrect(logits, label, topk=1, name='incorrect_vector'):

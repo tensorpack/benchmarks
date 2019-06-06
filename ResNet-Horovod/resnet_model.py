@@ -3,11 +3,59 @@
 # File: resnet_model.py
 
 import tensorflow as tf
+from contextlib import contextmanager
 
 
 from tensorpack.tfutils.argscope import argscope
+from tensorpack.tfutils.varreplace import remap_variables
 from tensorpack.models import (
-    Conv2D, MaxPooling, GlobalAvgPooling, BatchNorm, FullyConnected, BNReLU)
+    Conv2D, MaxPooling, GlobalAvgPooling, BatchNorm, FullyConnected, BNReLU, layer_register)
+
+
+@layer_register(log_shape=False, use_scope=False)
+def Norm(x, type, gamma_initializer):
+    """
+    A norm layer (which depends on 'type')
+
+    Args:
+        type (str): one of "BN" or "GN"
+    """
+    assert type in ["BN", "GN"]
+    if type == "BN":
+        return BatchNorm('bn', x, gamma_initializer=gamma_initializer)
+    else:
+        return GroupNorm('gn', x, gamma_initializer=gamma_initializer)
+
+
+@layer_register(log_shape=True)
+def GroupNorm(x, group=32, gamma_initializer=tf.constant_initializer(1.)):
+    """
+    https://arxiv.org/abs/1803.08494
+    """
+    shape = x.get_shape().as_list()
+    ndims = len(shape)
+    assert ndims == 4, shape
+    chan = shape[1]
+    assert chan % group == 0, chan
+    group_size = chan // group
+
+    orig_shape = tf.shape(x)
+    h, w = orig_shape[2], orig_shape[3]
+
+    x = tf.reshape(x, tf.stack([-1, group, group_size, h, w]))
+
+    mean, var = tf.nn.moments(x, [2, 3, 4], keep_dims=True)
+
+    new_shape = [1, group, group_size, 1, 1]
+
+    beta = tf.get_variable('beta', [chan], initializer=tf.constant_initializer())
+    beta = tf.reshape(beta, new_shape)
+
+    gamma = tf.get_variable('gamma', [chan], initializer=gamma_initializer)
+    gamma = tf.reshape(gamma, new_shape)
+
+    out = tf.nn.batch_normalization(x, mean, var, beta, gamma, 1e-5, name='output')
+    return tf.reshape(out, orig_shape, name='output')
 
 
 def resnet_shortcut(l, n_out, stride, activation=tf.identity):
@@ -18,11 +66,10 @@ def resnet_shortcut(l, n_out, stride, activation=tf.identity):
         return l
 
 
-def get_bn(zero_init=False):
-    if zero_init:
-        return lambda x, name=None: BatchNorm('bn', x, gamma_initializer=tf.zeros_initializer())
-    else:
-        return lambda x, name=None: BatchNorm('bn', x)
+def get_norm(zero_init=False):
+    return lambda x: \
+        Norm(x,
+             gamma_initializer=tf.zeros_initializer() if zero_init else tf.constant_initializer(1.))
 
 
 def resnet_bottleneck(l, ch_out, stride, stride_first=False):
@@ -40,8 +87,8 @@ def resnet_bottleneck(l, ch_out, stride, stride_first=False):
     to be 1, except for each residual block's last BN
     where γ is initialized to be 0.
     """
-    l = Conv2D('conv3', l, ch_out * 4, 1, activation=get_bn(zero_init=True))
-    ret = l + resnet_shortcut(shortcut, ch_out * 4, stride, activation=get_bn(zero_init=False))
+    l = Conv2D('conv3', l, ch_out * 4, 1, activation=get_norm(zero_init=True))
+    ret = l + resnet_shortcut(shortcut, ch_out * 4, stride, activation=get_norm(zero_init=False))
     return tf.nn.relu(ret, name='block_output')
 
 
@@ -51,6 +98,24 @@ def resnet_group(name, l, block_func, features, count, stride):
             with tf.variable_scope('block{}'.format(i)):
                 l = block_func(l, features, stride if i == 0 else 1)
     return l
+
+
+@contextmanager
+def weight_standardization_context(enable):
+    if enable:
+        def weight_standardization(v):
+            if (not v.name.endswith('/W:0')) or v.shape.ndims != 4:
+                return v
+            print("WS on " + v.name)
+            mean, std = tf.nn.moments(v, [0, 1, 2], keep_dims=True)
+            v = (v - mean) / (std + 1e-5)
+            return v
+
+        with remap_variables(weight_standardization):
+            yield
+
+    else:
+        yield
 
 
 def resnet_backbone(image, num_blocks, group_func, block_func):
