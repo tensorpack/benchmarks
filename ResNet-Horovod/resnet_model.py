@@ -101,9 +101,8 @@ def weight_standardization_context(enable):
         def weight_standardization(v):
             if (not v.name.endswith('/W:0')) or v.shape.ndims != 4:
                 return v
-            print("WS on " + v.name)
-            mean, std = tf.nn.moments(v, [0, 1, 2], keep_dims=True)
-            v = (v - mean) / (std + 1e-5)
+            mean, var = tf.nn.moments(v, [0, 1, 2], keep_dims=True)
+            v = (v - mean) / (tf.sqrt(var) + 1e-5)
             return v
 
         with remap_variables(weight_standardization):
