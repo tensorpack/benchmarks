@@ -165,7 +165,7 @@ if __name__ == '__main__':
     model = Model(args.depth, args.norm, args.use_ws)
     model.accum_grad = args.accum_grad
     if args.weight_decay_norm:
-        model.weight_decay_pattern = ".*/W|.*/gamma|.*/beta"""
+        model.weight_decay_pattern = ".*/W|.*/gamma|.*/beta"
 
     if args.eval:
         batch = 128    # something that can run on one gpu

@@ -212,7 +212,7 @@ if __name__ == '__main__':
                             'zmq-serve', 'zmq-consume'])
     parser.add_argument('--variable-update', help='variable update strategy',
                         type=str,
-                        choices=['replicated', 'parameter_server', 'horovod'],
+                        choices=['replicated', 'parameter_server', 'horovod', 'byteps'],
                         required=True)
 
     parser.add_argument('--ps-hosts')
@@ -255,6 +255,7 @@ if __name__ == '__main__':
                     NUM_GPU, average=False, mode='hierarchical' if NUM_GPU >= 8 else 'cpu'),
                 # average=False is the actual configuration used by tfbench
                 'horovod': lambda: HorovodTrainer(),
+                'byteps': lambda: BytePSTrainer(),
                 'parameter_server': lambda: SyncMultiGPUTrainerParameterServer(NUM_GPU, ps_device='cpu')
             }[args.variable_update]()
             if args.variable_update == 'replicated':
@@ -262,10 +263,11 @@ if __name__ == '__main__':
 
     M = TFBenchModel if args.model == 'tfbench' else TensorpackModel
     callbacks = [
-        GPUUtilizationTracker(),
         GPUMemoryTracker(),
         # ModelSaver(checkpoint_dir='./tmpmodel'),  # it takes time
     ]
+    if args.variable_update != 'horovod':
+        callbacks.append(GPUUtilizationTracker())
     try:
         from tensorpack.callbacks import ThroughputTracker
     except ImportError:

@@ -13,7 +13,7 @@ from tensorpack.models import (
 
 
 @layer_register(log_shape=False, use_scope=False)
-def Norm(x, type, gamma_initializer):
+def Norm(x, type, gamma_initializer=tf.constant_initializer(1.)):
     """
     A norm layer (which depends on 'type')
 
@@ -66,29 +66,24 @@ def resnet_shortcut(l, n_out, stride, activation=tf.identity):
         return l
 
 
-def get_norm(zero_init=False):
-    return lambda x: \
-        Norm(x,
-             gamma_initializer=tf.zeros_initializer() if zero_init else tf.constant_initializer(1.))
-
-
 def resnet_bottleneck(l, ch_out, stride, stride_first=False):
     shortcut = l
-    l = Conv2D('conv1', l, ch_out, 1, strides=stride if stride_first else 1, activation=BNReLU)
+    norm_relu = lambda x: tf.nn.relu(Norm(x))
+    l = Conv2D('conv1', l, ch_out, 1, strides=stride if stride_first else 1, activation=norm_relu)
     """
     Sec 5.1:
     We use the ResNet-50 [16] variant from [12], noting that
     the stride-2 convolutions are on 3×3 layers instead of on 1×1 layers
     """
-    l = Conv2D('conv2', l, ch_out, 3, strides=1 if stride_first else stride, activation=BNReLU)
+    l = Conv2D('conv2', l, ch_out, 3, strides=1 if stride_first else stride, activation=norm_relu)
     """
     Section 5.1:
     For BN layers, the learnable scaling coefficient γ is initialized
     to be 1, except for each residual block's last BN
     where γ is initialized to be 0.
     """
-    l = Conv2D('conv3', l, ch_out * 4, 1, activation=get_norm(zero_init=True))
-    ret = l + resnet_shortcut(shortcut, ch_out * 4, stride, activation=get_norm(zero_init=False))
+    l = Conv2D('conv3', l, ch_out * 4, 1, activation=lambda x: Norm(x, gamma_initializer=tf.zeros_initializer()))
+    ret = l + resnet_shortcut(shortcut, ch_out * 4, stride, activation=lambda x: Norm(x))
     return tf.nn.relu(ret, name='block_output')
 
 

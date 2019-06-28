@@ -76,6 +76,7 @@ Environment:
 
 Results:
 
+* `--fake-location=gpu --variable-update=horovod`: 2874 img/s.
 * `--fake-location=gpu --variable-update=replicated`: 2844 img/s.
 * `--fake-location=gpu --variable-update=replicated --use-fp16`: 5224 img/s.
 * `--fake-location=gpu --variable-update=replicated --use-fp16 --batch 128`: 5891 img/s
