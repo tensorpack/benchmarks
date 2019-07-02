@@ -97,6 +97,11 @@ def resnet_group(name, l, block_func, features, count, stride):
 
 @contextmanager
 def weight_standardization_context(enable):
+    """
+    Implement Centered Weight Normalization
+    (http://openaccess.thecvf.com/content_ICCV_2017/papers/Huang_Centered_Weight_Normalization_ICCV_2017_paper.pdf)
+    or Weight Standardization (https://arxiv.org/abs/1903.10520)
+    """
     if enable:
         def weight_standardization(v):
             if (not v.name.endswith('/W:0')) or v.shape.ndims != 4:
