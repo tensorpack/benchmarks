@@ -240,6 +240,7 @@ if __name__ == '__main__':
             config=sessconf)
 
     NUM_GPU = get_nr_gpu()
+    logger.info("Number of GPUs found: " + str(NUM_GPU))
 
     if args.job:
         trainer = {
@@ -268,6 +269,13 @@ if __name__ == '__main__':
     ]
     if args.variable_update != 'horovod':
         callbacks.append(GPUUtilizationTracker())
+    if args.variable_update in ['horovod', 'byteps']:
+        # disable logging if not on first rank
+        if trainer.hvd.rank() != 0:
+            logger.addFilter(lambda _: False)
+        NUM_GPU = trainer.hvd.size()
+        logger.info("Number of GPUs to use: " + str(NUM_GPU))
+
     try:
         from tensorpack.callbacks import ThroughputTracker
     except ImportError:
