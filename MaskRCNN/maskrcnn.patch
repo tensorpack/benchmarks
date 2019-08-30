@@ -1,0 +1,51 @@
+diff --git i/samples/coco/coco.py w/samples/coco/coco.py
+index 5d172b5..b0bba41 100644
+--- i/samples/coco/coco.py
++++ w/samples/coco/coco.py
+@@ -78,10 +78,13 @@ class CocoConfig(Config):
+
+     # We use a GPU with 12GB memory, which can fit two images.
+     # Adjust down if you use a smaller GPU.
+-    IMAGES_PER_GPU = 2
++    IMAGES_PER_GPU = 1
+
+     # Uncomment to train on 8 GPUs (default is 1)
+-    # GPU_COUNT = 8
++    GPU_COUNT = 8
++    BACKBONE = "resnet50"
++    STEPS_PER_EPOCH = 200
++    TRAIN_ROIS_PER_IMAGE = 512
+
+     # Number of classes (including background)
+     NUM_CLASSES = 1 + 80  # COCO has 80 classes
+@@ -496,29 +499,10 @@ if __name__ == '__main__':
+         # *** This training schedule is an example. Update to your needs ***
+
+         # Training - Stage 1
+-        print("Training network heads")
+         model.train(dataset_train, dataset_val,
+                     learning_rate=config.LEARNING_RATE,
+                     epochs=40,
+-                    layers='heads',
+-                    augmentation=augmentation)
+-
+-        # Training - Stage 2
+-        # Finetune layers from ResNet stage 4 and up
+-        print("Fine tune Resnet stage 4 and up")
+-        model.train(dataset_train, dataset_val,
+-                    learning_rate=config.LEARNING_RATE,
+-                    epochs=120,
+-                    layers='4+',
+-                    augmentation=augmentation)
+-
+-        # Training - Stage 3
+-        # Fine tune all layers
+-        print("Fine tune all layers")
+-        model.train(dataset_train, dataset_val,
+-                    learning_rate=config.LEARNING_RATE / 10,
+-                    epochs=160,
+-                    layers='all',
++                    layers='3+',
+                     augmentation=augmentation)
+
+     elif args.command == "evaluate":
