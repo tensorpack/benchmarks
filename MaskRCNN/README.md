@@ -22,12 +22,12 @@
 
 ### [tensorpack FasterRCNN example](https://github.com/tensorpack/tensorpack/tree/master/examples/FasterRCNN):
 
-Using `TRAINER=replicated`, the speed is about 51 img/s:
+Using `TRAINER=replicated`, the speed is about 42 img/s:
 ```
 ./train.py  --config DATA.BASEDIR=~/data/coco DATA.NUM_WORKERS=20 MODE_FPN=True --load ImageNet-R50-AlignPadding.npz
 ```
 
-Using `TRAINER=horovod`, the speed is about 58 img/s:
+Using `TRAINER=horovod`, the speed is about 50 img/s:
 ```
 mpirun -np 8 ./train.py --config DATA.BASEDIR=~/data/coco MODE_FPN=True TRAINER=horovod --load ImageNet-R50-AlignPadding.npz
 ```
@@ -41,17 +41,17 @@ Then, run command:
 python coco.py train --dataset=~/data/coco/ --model=imagenet
 ```
 
-It trains at 0.77 ms / steps, aka 11 img/s.
+It trains at 0.77 ms / steps, aka 10 img/s.
 
 
 ### Note:
 
 * Mask R-CNN is a complicated system and there could be many implementation differences.
   The above diff only makes the two systems perform roughly the same training.
-  
+
 * The training time of a R-CNN typically slowly decreases as the training progresses.
   In this experiment we only look at the training time of the first couple thousand iterations.
   It cannot be extrapolated to compute the total training time of the model.
 
-* Tensorpack's Mask R-CNN is not only fast, but also 
+* Tensorpack's Mask R-CNN is not only fast, but also
   [more accurate](https://github.com/tensorpack/tensorpack/tree/master/examples/FasterRCNN#results).
