@@ -1,5 +1,8 @@
 ## Mask R-CNN
 
+This is a benchmark of tensorpack's Mask R-CNN implementation
+and the popular Matterport Mask R-CNN implementation.
+
 ### Environment:
 
 * TensorFlow 1.14 (6e0893c79) + PR30893
@@ -41,7 +44,8 @@ Then, run command:
 python coco.py train --dataset=~/data/coco/ --model=imagenet
 ```
 
-It trains at 0.77 ms / steps, aka 10 img/s.
+It trains at 0.77 ms / step, aka 10 img/s.
+If using 2 images per GPU, it can improve to 12 img/s.
 
 
 ### Note:
