@@ -44,7 +44,7 @@ Then, run command:
 python coco.py train --dataset=~/data/coco/ --model=imagenet
 ```
 
-It trains at 0.77 ms / step, aka 10 img/s.
+It trains at 0.77 s / step, aka 10 img/s.
 If using 2 images per GPU, it can improve to 12 img/s.
 
 
