@@ -96,11 +96,17 @@ def resnet_group(name, l, block_func, features, count, stride):
 
 
 @contextmanager
-def weight_standardization_context(enable):
+def weight_standardization_context(enable=True):
     """
     Implement Centered Weight Normalization
     (http://openaccess.thecvf.com/content_ICCV_2017/papers/Huang_Centered_Weight_Normalization_ICCV_2017_paper.pdf)
     or Weight Standardization (https://arxiv.org/abs/1903.10520)
+
+    Usage:
+
+    with weight_standardization_context():
+        l = Conv2D('conv', l)
+        ...
     """
     if enable:
         def weight_standardization(v):

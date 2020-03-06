@@ -17,24 +17,21 @@ import horovod.tensorflow as hvd
 from imagenet_utils import (
     fbresnet_augmentor, get_val_dataflow, ImageNetModel, eval_classification)
 from resnet_model import (
-    resnet_group, resnet_bottleneck, resnet_backbone,
-    weight_standardization_context, Norm)
+    resnet_group, resnet_bottleneck, resnet_backbone, Norm)
 
 
 class Model(ImageNetModel):
-    def __init__(self, depth, norm='BN', use_ws=False):
+    def __init__(self, depth, norm='BN'):
         self.num_blocks = {
             50: [3, 4, 6, 3],
             101: [3, 4, 23, 3],
             152: [3, 8, 36, 3],
         }[depth]
         self.norm = norm
-        self.use_ws = use_ws
 
     def get_logits(self, image):
         with argscope([Conv2D, MaxPooling, GlobalAvgPooling, BatchNorm], data_format='NCHW'), \
-                argscope(Norm, type=self.norm), \
-                weight_standardization_context(enable=self.use_ws):
+                argscope(Norm, type=self.norm):
             return resnet_backbone(image, self.num_blocks, resnet_group, resnet_bottleneck)
 
 
@@ -144,7 +141,6 @@ if __name__ == '__main__':
     parser.add_argument('--fake', help='use fakedata to test or benchmark this model', action='store_true')
     parser.add_argument('-d', '--depth', help='resnet depth',
                         type=int, default=50, choices=[50, 101, 152])
-    parser.add_argument('--use-ws', action='store_true')
     parser.add_argument('--norm', choices=['BN', 'GN'], default='BN')
     parser.add_argument('--accum-grad', type=int, default=1)
     parser.add_argument('--weight-decay-norm', action='store_true',
@@ -162,7 +158,7 @@ if __name__ == '__main__':
     parser.add_argument('--batch', help='per-GPU batch size', default=32, type=int)
     args = parser.parse_args()
 
-    model = Model(args.depth, args.norm, args.use_ws)
+    model = Model(args.depth, args.norm)
     model.accum_grad = args.accum_grad
     if args.weight_decay_norm:
         model.weight_decay_pattern = ".*/W|.*/gamma|.*/beta"
