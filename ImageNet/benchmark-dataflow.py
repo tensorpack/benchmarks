@@ -9,7 +9,6 @@ from tensorpack import *
 from tensorpack.dataflow.imgaug import *
 from tensorpack.dataflow.parallel import PlasmaGetData, PlasmaPutData  # noqa
 from tensorpack.utils.serialize import loads
-from tensorpack.dataflow.dftools import *
 
 import augmentors
 
@@ -20,7 +19,7 @@ def test_orig(dir, name, augs, batch):
 
     ds = BatchData(ds, batch)
     # ds = PlasmaPutData(ds)
-    ds = PrefetchDataZMQ(ds, 50, hwm=80)
+    ds = MultiProcessRunnerZMQ(ds, 50, hwm=80)
     # ds = PlasmaGetData(ds)
     return ds
 
@@ -28,7 +27,7 @@ def test_orig(dir, name, augs, batch):
 def test_lmdb_train(db, augs, batch):
     ds = LMDBData(db, shuffle=False)
     ds = LocallyShuffleData(ds, 50000)
-    ds = PrefetchData(ds, 5000, 1)
+    ds = MultiProcessRunner(ds, 5000, 1)
     return ds
 
     ds = LMDBDataPoint(ds)
@@ -40,7 +39,7 @@ def test_lmdb_train(db, augs, batch):
 
     ds = BatchData(ds, batch, use_list=True)
     # ds = PlasmaPutData(ds)
-    ds = PrefetchDataZMQ(ds, 40, hwm=80)
+    ds = MultiProcessRunnerZMQ(ds, 40, hwm=80)
     # ds = PlasmaGetData(ds)
     return ds
 
@@ -62,7 +61,7 @@ def test_lmdb_inference(db, augs, batch):
     # ds = MultiThreadMapData(ds, 40, mapper, buffer_size=2000)
 
     ds = BatchData(ds, batch)
-    ds = PrefetchDataZMQ(ds, 1)
+    ds = MultiProcessRunnerZMQ(ds, 1)
     return ds
 
 
@@ -76,9 +75,9 @@ def test_inference(dir, name, augs, batch=128):
         im = cv2.imread(fname, cv2.IMREAD_COLOR)
         im = aug.augment(im)
         return im, cls
-    ds = ThreadedMapData(ds, 30, mapf, buffer_size=2000, strict=True)
+    ds = MultiThreadMapData(ds, 30, mapf, buffer_size=2000, strict=True)
     ds = BatchData(ds, batch)
-    ds = PrefetchDataZMQ(ds, 1)
+    ds = MultiProcessRunnerZMQ(ds, 1)
     return ds
 
 
