@@ -10,7 +10,7 @@ import numpy as np
 
 import tensorflow as tf
 from tensorpack import *
-from tensorpack.tfutils import argscope, get_model_loader
+from tensorpack.tfutils import argscope, SmartInit
 
 import horovod.tensorflow as hvd
 
@@ -166,7 +166,7 @@ if __name__ == '__main__':
     if args.eval:
         batch = 128    # something that can run on one gpu
         ds = get_val_dataflow(args.data, batch, fbresnet_augmentor(False))
-        eval_classification(model, get_model_loader(args.load), ds)
+        eval_classification(model, SmartInit(args.load), ds)
         sys.exit()
 
     logger.info("Training on {}".format(socket.gethostname()))

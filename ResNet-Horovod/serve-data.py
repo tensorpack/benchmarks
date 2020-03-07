@@ -4,30 +4,14 @@
 
 import argparse
 import os
-import multiprocessing as mp
 import socket
 
 from tensorpack.dataflow import (
-    send_dataflow_zmq, MapData, TestDataSpeed, FakeData, dataset,
-    AugmentImageComponent, BatchData, PrefetchDataZMQ)
+    send_dataflow_zmq, MapData, TestDataSpeed, FakeData, dataset)
 from tensorpack.utils import logger
-from imagenet_utils import fbresnet_augmentor
+from imagenet_utils import fbresnet_augmentor, get_train_dataflow
 
 from zmq_ops import dump_arrays
-
-
-def get_data(batch, augmentors):
-    """
-    Sec 3, Remark 4:
-    Use a single random shuffling of the training data (per epoch) that is divided amongst all k workers.
-
-    NOTE: Here we do not follow the paper, but it makes little differences.
-    """
-    ds = dataset.ILSVRC12(args.data, 'train', shuffle=True)
-    ds = AugmentImageComponent(ds, augmentors, copy=False)
-    ds = BatchData(ds, batch, remainder=False)
-    ds = PrefetchDataZMQ(ds, min(50, mp.cpu_count()))
-    return ds
 
 
 if __name__ == '__main__':
@@ -47,8 +31,7 @@ if __name__ == '__main__':
             [[args.batch, 224, 224, 3], [args.batch]],
             1000, random=False, dtype=['uint8', 'int32'])
     else:
-        augs = fbresnet_augmentor(True)
-        ds = get_data(args.batch, augs)
+        ds = get_train_dataflow(args.data, args.batch)
 
     logger.info("Serving data on {}".format(socket.gethostname()))
 

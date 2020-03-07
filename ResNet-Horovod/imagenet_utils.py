@@ -8,7 +8,7 @@ https://github.com/tensorpack/tensorpack/blob/master/examples/ImageNetModels/ima
 """
 
 
-import multiprocessing
+import multiprocessing as mp
 import numpy as np
 from abc import abstractmethod
 import cv2
@@ -16,7 +16,8 @@ import tensorflow as tf
 
 from tensorpack import imgaug, dataset, ModelDesc
 from tensorpack.dataflow import (
-    BatchData, MultiThreadMapData, DataFromList)
+    BatchData, MultiThreadMapData, DataFromList,
+    AugmentImageComponent, MultiProcessRunnerZMQ)
 from tensorpack.models import regularize_cost
 from tensorpack.predict import FeedfreePredictor, PredictConfig
 from tensorpack.tfutils.summary import add_moving_summary
@@ -70,6 +71,24 @@ def fbresnet_augmentor(isTrain):
     return augmentors
 
 
+def get_train_dataflow(datadir, batch, augmentors=None):
+    """
+    Sec 3, Remark 4:
+    Use a single random shuffling of the training data (per epoch)
+    that is divided amongst all k workers.
+
+    NOTE: Here we do not follow the paper which makes some differences.
+    Here, each machine shuffles independently.
+    """
+    if augmentors is None:
+        augmentors = fbresnet_augmentor(True)
+    ds = dataset.ILSVRC12(datadir, 'train', shuffle=True)
+    ds = AugmentImageComponent(ds, augmentors, copy=False)
+    ds = BatchData(ds, batch, remainder=False)
+    ds = MultiProcessRunnerZMQ(ds, min(50, mp.cpu_count()))
+    return ds
+
+
 def get_val_dataflow(
         datadir, batch_size,
         augmentors=None, parallel=None,
@@ -79,7 +98,7 @@ def get_val_dataflow(
     assert datadir is not None
     assert isinstance(augmentors, list)
     if parallel is None:
-        parallel = min(40, multiprocessing.cpu_count())
+        parallel = min(40, mp.cpu_count())
 
     if num_splits is None:
         ds = dataset.ILSVRC12Files(datadir, 'val', shuffle=False)
