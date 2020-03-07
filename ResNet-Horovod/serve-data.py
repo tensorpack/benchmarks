@@ -9,7 +9,7 @@ import socket
 from tensorpack.dataflow import (
     send_dataflow_zmq, MapData, TestDataSpeed, FakeData, dataset)
 from tensorpack.utils import logger
-from imagenet_utils import fbresnet_augmentor, get_train_dataflow
+from imagenet_utils import get_train_dataflow
 
 from zmq_ops import dump_arrays
 
