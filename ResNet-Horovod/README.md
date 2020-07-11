@@ -8,10 +8,10 @@ It reproduces the settings in the paper
 
 The code is annotated with sentences from the paper.
 
-Based on this baseline implementation, we implemented adversarial training and obtained ImageNet classifiers with state-of-the-art adversarial robustness. See our code release at [facebookresearch/ImageNet-Adversarial-Training](https://github.com/facebookresearch/ImageNet-Adversarial-Training/). 
+Based on this baseline implementation, we implemented adversarial training and obtained ImageNet classifiers with state-of-the-art adversarial robustness. See our code release at [facebookresearch/ImageNet-Adversarial-Training](https://github.com/facebookresearch/ImageNet-Adversarial-Training/).
 
 ## Dependencies:
-+ TensorFlow>=1.5, tensorpack>=0.8.5.
++ TensorFlow>=1.5, tensorpack>=0.9.9.
 + [Horovod](https://github.com/uber/horovod) with NCCL support.
 	See [doc](https://github.com/uber/horovod/blob/master/docs/gpus.md) for its installation instructions.
 + [zmq_ops](https://github.com/tensorpack/zmq_ops): optional but recommended.

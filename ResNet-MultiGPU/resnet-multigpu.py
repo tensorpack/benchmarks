@@ -9,7 +9,6 @@ from contextlib import contextmanager
 import tensorflow as tf
 
 from tensorpack import *
-from tensorflow.contrib.layers import variance_scaling_initializer
 from tensorpack.utils.gpu import get_nr_gpu
 from tensorpack.tfutils.summary import *
 from tensorpack.tfutils.collection import freeze_collection
@@ -132,7 +131,7 @@ class TensorpackModel(Model):
         defs = [3, 4, 6, 3]
 
         with argscope(Conv2D, use_bias=False,
-                      kernel_initializer=variance_scaling_initializer(mode='FAN_OUT')), \
+                      kernel_initializer=tf.variance_scaling_initializer(mode='fan_out')), \
                 argscope([Conv2D, MaxPooling, GlobalAvgPooling, BatchNorm], data_format=self.data_format):
             logits = (LinearWrap(image)
                       .Conv2D('conv0', 64, 7, strides=2)
