@@ -81,3 +81,18 @@ Results:
 * `--fake-location=gpu --variable-update=replicated --use-fp16`: 5224 img/s.
 * `--fake-location=gpu --variable-update=replicated --use-fp16 --batch 128`: 5891 img/s
 * `--fake-location=gpu --variable-update=replicated --use-fp16 --batch 128 --use-xla-compile`: 9225 img/s
+
+## Performance @ Jul 2020:
+
+Environment:
+
+* Software: TF 2.2 with v1 compatible mode, cuda 10.1, cudnn 7.6.5, tensorpack 0.10.1.
+* Hardware: AWS p2.16xlarge (8 V100s, 16G memory each)
+
+Results:
+
+* `--fake-location=gpu --variable-update=horovod`: 2973 img/s.
+* `--fake-location=gpu --variable-update=replicated`: 2961 img/s.
+* `--fake-location=gpu --variable-update=replicated --batch 128`: 3137 img/s.
+* `--fake-location=gpu --variable-update=replicated --use-fp16 --batch 128`: 6141 img/s
+* `--fake-location=gpu --variable-update=replicated --use-fp16 --batch 128 --use-xla-compile`: 9341 img/s

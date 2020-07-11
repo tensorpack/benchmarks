@@ -5,12 +5,14 @@
 import sys
 import argparse
 import os
-from contextlib import contextmanager
+from contextlib import contextmanager, ExitStack
 import tensorflow as tf
 
 from tensorpack import *
 from tensorpack.utils.gpu import get_nr_gpu
 from tensorpack.tfutils.summary import *
+from tensorpack.utils.argtools import log_once
+
 from tensorpack.tfutils.collection import freeze_collection
 from tensorpack.tfutils import get_current_tower_context
 from tensorpack.tfutils.varreplace import custom_getter_scope
@@ -98,7 +100,24 @@ class TensorpackModel(Model):
     Implement the same model with tensorpack layers.
     """
     def _get_logits(self, image):
-        assert not args.use_fp16
+
+        def fp16_getter(getter, *args, **kwargs):
+            name = args[0] if len(args) else kwargs['name']
+            if not name.endswith('/W') and not name.endswith('/b'):
+                """
+                Following convention, convolution & fc are quantized.
+                BatchNorm (gamma & beta) are not quantized.
+                """
+                return getter(*args, **kwargs)
+            else:
+                if kwargs['dtype'] == tf.float16:
+                    kwargs['dtype'] = tf.float32
+                    ret = getter(*args, **kwargs)
+                    ret = tf.cast(ret, tf.float16)
+                    log_once("Variable {} casted to fp16 ...".format(name))
+                    return ret
+                else:
+                    return getter(*args, **kwargs)
 
         def shortcut(l, n_in, n_out, stride):
             if n_in != n_out:
@@ -130,9 +149,16 @@ class TensorpackModel(Model):
 
         defs = [3, 4, 6, 3]
 
-        with argscope(Conv2D, use_bias=False,
-                      kernel_initializer=tf.variance_scaling_initializer(mode='fan_out')), \
-                argscope([Conv2D, MaxPooling, GlobalAvgPooling, BatchNorm], data_format=self.data_format):
+        with ExitStack() as stack:
+            stack.enter_context(argscope(
+                Conv2D, use_bias=False,
+                kernel_initializer=tf.variance_scaling_initializer(mode='fan_out')))
+            stack.enter_context(argscope(
+                [Conv2D, MaxPooling, GlobalAvgPooling, BatchNorm],
+                data_format=self.data_format))
+            if args.use_fp16:
+                stack.enter_context(custom_getter_scope(fp16_getter))
+                image = tf.cast(image, tf.float16)
             logits = (LinearWrap(image)
                       .Conv2D('conv0', 64, 7, strides=2)
                       .BatchNorm('bn0')
@@ -144,6 +170,8 @@ class TensorpackModel(Model):
                       .apply(layer, 'group3', bottleneck, 512, defs[3], 2)
                       .GlobalAvgPooling('gap')
                       .FullyConnected('linear', 1000)())
+        if args.use_fp16:
+            logits = tf.cast(logits, tf.float32)
         return logits
 
 
@@ -195,7 +223,7 @@ def get_data(mode):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--gpu', help='comma separated list of GPU(s) to use.')
-    parser.add_argument('--model', choices=['tfbench', 'tensorpack'], default='tfbench')
+    parser.add_argument('--model', choices=['tfbench', 'tensorpack'], default='tensorpack')
     parser.add_argument('--load', help='load model')
     parser.add_argument('--prefetch', type=int, default=150)
     parser.add_argument('--use-fp16', action='store_true')
