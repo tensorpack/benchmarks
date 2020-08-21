@@ -73,7 +73,7 @@ def fbresnet_augmentor(isTrain):
     return augmentors
 
 
-def get_train_dataflow(datadir, batch, augmentors=None):
+def get_train_dataflow(datadir, batch, augmentors=None, parallel=None):
     """
     Sec 3, Remark 4:
     Use a single random shuffling of the training data (per epoch)
@@ -82,12 +82,14 @@ def get_train_dataflow(datadir, batch, augmentors=None):
     NOTE: Here we do not follow the paper which makes some differences.
     Here, each machine shuffles independently.
     """
+    if parallel is None:
+        parallel = min(50, mp.cpu_count())
     if augmentors is None:
         augmentors = fbresnet_augmentor(True)
     ds = dataset.ILSVRC12(datadir, 'train', shuffle=True)
     ds = AugmentImageComponent(ds, augmentors, copy=False)
     ds = BatchData(ds, batch, remainder=False)
-    ds = MultiProcessRunnerZMQ(ds, min(50, mp.cpu_count()))
+    ds = MultiProcessRunnerZMQ(ds, parallel)
     return ds
 
 
